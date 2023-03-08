@@ -20,6 +20,7 @@ function ActionWithReprompt(props: ActionWithRepromptProps) {
   async function performAction({ password, closeForm }: UserRepromptActionProp) {
     const toast = await showToast(Toast.Style.Animated, "Confirming...");
     try {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const vaultItem = await bitwarden.getItem(id, session.token!, { password });
       if (!vaultItem) throw new Error("Couldn't get item.");
       closeForm();
