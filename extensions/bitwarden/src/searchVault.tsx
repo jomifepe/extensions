@@ -5,7 +5,7 @@ import SearchItem from ~/components/searchVault/Itemm";
 import { BitwardenProvider } from "~/context/bitwarden";
 import { SessionProvider } from "~/context/session";
 import { useVault, VaultProvider } from "~/context/vault";
-import { Folder, Item } from "~/types/search";
+import { Folder, Item } from "~/types/vault";
 
 const SearchVaultCommand = () => (
   <RootErrorBoundary>
