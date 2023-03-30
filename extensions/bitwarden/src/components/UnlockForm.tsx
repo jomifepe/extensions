@@ -1,6 +1,7 @@
 import { Action, ActionPanel, Form, showToast, Toast } from "@raycast/api";
 import { useRef, useState } from "react";
 import { useBitwarden } from "~/context/bitwarden";
+import { captureException } from "~/utils/development";
 import useVaultMessages from "~/utils/hooks/useVaultMessages";
 import { hashMasterPasswordForReprompting } from "~/utils/passwords";
 
@@ -34,6 +35,7 @@ const UnlockForm = (props: UnlockFormProps) => {
             "Failed to unlock vault",
             `Please check your ${shouldShowServer ? "Server URL, " : ""}API Key and Secret.`
           );
+          captureException(error);
           return;
         }
       }
@@ -44,6 +46,7 @@ const UnlockForm = (props: UnlockFormProps) => {
       onUnlock(sessionToken, passwordHash);
     } catch (error) {
       showToast(Toast.Style.Failure, "Failed to unlock vault", "Check your credentials");
+      captureException(error);
     } finally {
       setLoading(false);
     }

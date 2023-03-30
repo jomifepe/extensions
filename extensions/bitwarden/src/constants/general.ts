@@ -10,6 +10,7 @@ export const LOCAL_STORAGE_KEY = {
   SERVER_URL: "cliServer",
   LAST_ACTIVITY_TIME: "lastActivityTime",
   VAULT_LOCK_REASON: "vaultLockReason",
+  DEBUG_LOG: "debugLog",
 };
 
 export const ERRORS = {

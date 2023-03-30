@@ -10,6 +10,7 @@ import { PasswordGeneratorOptions } from "~/types/passwords";
 import { Item } from "~/types/vault";
 import { getPasswordGeneratingArgs } from "~/utils/passwords";
 import { getServerUrlPreference } from "~/utils/preferences";
+import { captureException } from "~/utils/development";
 
 export class Bitwarden {
   private env: Record<string, string>;
@@ -77,6 +78,7 @@ export class Bitwarden {
       } else {
         toast.message = "Unknown error occurred";
       }
+      captureException(error);
     }
   }
 

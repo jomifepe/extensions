@@ -7,6 +7,7 @@ import { useBitwarden } from "~/context/bitwarden";
 import { VaultStatus } from "~/types/general";
 import { Preferences } from "~/types/preferences";
 import { SessionState } from "~/types/session";
+import { captureException } from "~/utils/development";
 import { hashMasterPasswordForReprompting } from "~/utils/passwords";
 
 export type Session = {
@@ -73,6 +74,8 @@ export function SessionProvider(props: SessionProviderProps) {
       let lastActivityTime: Date | undefined;
       if (!token || !passwordHash) throw new ShouldLockVaultError();
 
+      throw new Error("Something blew up");
+
       if (lastActivityTimeString && vaultTimeoutMs >= 0) {
         const lockReason = "Vault timed out due to inactivity";
         if (vaultTimeoutMs === 0) throw new ShouldLockVaultError(lockReason);
@@ -92,6 +95,7 @@ export function SessionProvider(props: SessionProviderProps) {
       if (status !== "unauthenticated") {
         await bitwarden.lock(reason);
       }
+      captureException(error);
     }
   }
 

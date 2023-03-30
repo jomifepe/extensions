@@ -3,6 +3,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useRe
 import { useBitwarden } from "~/context/bitwarden";
 import { useSession } from "~/context/session";
 import { Folder, Item } from "~/types/vault";
+import { captureException } from "~/utils/development";
 
 export type VaultState = {
   items: Item[];
@@ -51,6 +52,7 @@ export const VaultProvider = ({ children }: PropsWithChildren) => {
       setState({ isLoading: false, items, folders });
     } catch (error) {
       showToast(Toast.Style.Failure, "Failed to load vault.");
+      captureException(error);
     }
   }
 
@@ -65,6 +67,7 @@ export const VaultProvider = ({ children }: PropsWithChildren) => {
         await session.logout();
         toast.style = Toast.Style.Failure;
         toast.message = "Failed to sync. Please try logging in again.";
+        captureException(error);
       }
     }
   }
