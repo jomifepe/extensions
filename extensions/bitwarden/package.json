@@ -156,6 +156,13 @@
           ]
         }
       ]
+    },
+    {
+      "name": "create-new-item",
+      "title": "Create Item",
+      "subtitle": "Bitwarden",
+      "description": "Create a new item in your bitwarden vault.",
+      "mode": "view"
     }
   ],
   "preferences": [

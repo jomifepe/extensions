@@ -36,6 +36,7 @@ export interface Folder {
 }
 
 export interface Identity {
+  firstName: string | null;
   middleName: string | null;
   lastName: string | null;
   address1: string | null;

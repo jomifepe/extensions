@@ -40,7 +40,7 @@ const VaultListenersProvider = ({ children }: { children: ReactNode }) => {
 
 export const useVaultItemPublisher = () => {
   const context = useContext(VaultListenersContext);
-  if (context == null) throw new Error("useVaultItemPublisher must be used within a VaultListenersProvider");
+  if (context == null) return () => null;
 
   return context.publishItems;
 };
