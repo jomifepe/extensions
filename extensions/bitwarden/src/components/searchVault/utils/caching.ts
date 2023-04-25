@@ -53,6 +53,7 @@ function cleanLogin(login: Item["login"]): Item["login"] {
 function cleanIdentity(identity: Item["identity"]): Item["identity"] {
   if (!identity) return undefined;
   return {
+    firstName: hideIfDefined(identity.firstName),
     middleName: hideIfDefined(identity.middleName),
     lastName: hideIfDefined(identity.lastName),
     address1: hideIfDefined(identity.address1),

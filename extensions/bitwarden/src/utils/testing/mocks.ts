@@ -46,6 +46,7 @@ export function getMockItems(
         code: sensitiveValue,
       },
       identity: {
+        firstName: sensitiveValue,
         middleName: sensitiveValue,
         lastName: sensitiveValue,
         address1: sensitiveValue,
