@@ -21,10 +21,9 @@ function useGetUpdatedVaultItem() {
     loadingMessage?: string
   ): Promise<TResult> {
     const currentValue = selector(possiblyCachedItem);
-    if (currentValue !== SENSITIVE_VALUE_PLACEHOLDER) return currentValue;
+    if (!valueHasSensitiveValuePlaceholder(currentValue)) return currentValue;
 
-    let toast: Toast | undefined;
-    if (loadingMessage) toast = await showToast(Toast.Style.Animated, loadingMessage);
+    const toast = loadingMessage ? await showToast(Toast.Style.Animated, loadingMessage) : undefined;
     const value = selector(await getItemFromVault(possiblyCachedItem.id));
     await toast?.hide();
 
@@ -32,6 +31,19 @@ function useGetUpdatedVaultItem() {
   }
 
   return getItem;
+}
+
+function valueHasSensitiveValuePlaceholder(value: any) {
+  try {
+    if (typeof value === "object") {
+      return JSON.stringify(value).includes(SENSITIVE_VALUE_PLACEHOLDER);
+    } else if (typeof value === "string") {
+      return value === SENSITIVE_VALUE_PLACEHOLDER;
+    }
+    return false;
+  } catch (error) {
+    return false;
+  }
 }
 
 export default useGetUpdatedVaultItem;
