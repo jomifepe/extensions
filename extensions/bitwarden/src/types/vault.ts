@@ -1,5 +1,21 @@
 import { PasswordHistory } from "~/types/passwords";
 
+export interface CreateItemPayload {
+  organizationId: string | null;
+  folderId: string | null;
+  type: ItemType;
+  reprompt: Reprompt;
+  name: string;
+  notes: string | null;
+  favorite: boolean;
+  login?: Login | null;
+  collectionIds: string[];
+  identity?: Identity | null;
+  fields?: Field[];
+  secureNote?: SecureNote | null;
+  card?: Card | null;
+}
+
 export interface Item {
   object: "item";
   id: string;

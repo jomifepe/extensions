@@ -23,6 +23,7 @@ export const SessionContext = createContext<Session | null>(null);
 
 export type SessionProviderProps = PropsWithChildren<{
   unlock?: boolean;
+  waitForVault?: boolean;
 }>;
 
 /**
@@ -30,6 +31,7 @@ export type SessionProviderProps = PropsWithChildren<{
  * @param props.unlock If true, an unlock form will be displayed if the vault is locked or unauthenticated.
  */
 export function SessionProvider(props: SessionProviderProps) {
+  const { unlock, waitForVault = true, children } = props;
   const bitwarden = useBitwarden();
   const [state, dispatch] = useSessionReducer();
 
@@ -87,11 +89,11 @@ export function SessionProvider(props: SessionProviderProps) {
 
   if (state.isLoading) return <List isLoading />;
 
-  const showUnlockForm = state.isLocked || !state.isAuthenticated;
-  const children = state.token ? props.children : null;
+  const showUnlockForm = waitForVault && (state.isLocked || !state.isAuthenticated);
+  const childrenComponents = waitForVault && state.token ? children : null;
   return (
     <SessionContext.Provider value={contextValue}>
-      {showUnlockForm && props.unlock ? <UnlockForm lockReason={state.lockReason} /> : children}
+      {showUnlockForm && unlock ? <UnlockForm lockReason={state.lockReason} /> : childrenComponents}
     </SessionContext.Provider>
   );
 }

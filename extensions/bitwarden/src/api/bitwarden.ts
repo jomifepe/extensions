@@ -6,7 +6,7 @@ import { LOCAL_STORAGE_KEY, DEFAULT_SERVER_URL } from "~/constants/general";
 import { VaultState, VaultStatus } from "~/types/general";
 import { Preferences } from "~/types/preferences";
 import { PasswordGeneratorOptions } from "~/types/passwords";
-import { Folder, Item } from "~/types/vault";
+import { CreateItemPayload, Folder, Item } from "~/types/vault";
 import { getPasswordGeneratingArgs } from "~/utils/passwords";
 import { getServerUrlPreference } from "~/utils/preferences";
 import { CLINotFoundError, VaultIsLockedError } from "~/utils/errors";
@@ -210,6 +210,12 @@ export class Bitwarden {
     const args = options ? getPasswordGeneratingArgs(options) : [];
     const { stdout } = await this.exec(["generate", ...args], { abortController });
     return stdout;
+  }
+
+  async createItem(item: CreateItemPayload): Promise<Item> {
+    const encodedItem = Buffer.from(JSON.stringify(item)).toString("base64");
+    const { stdout } = await this.exec(["create", "item", encodedItem]);
+    return JSON.parse(stdout);
   }
 
   private isPromptWaitingForMasterPassword(result: ExecaReturnValue): boolean {

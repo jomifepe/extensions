@@ -1,33 +1,92 @@
-import { Form } from "@raycast/api";
-import { useState } from "react";
+import { Action, ActionPanel, Form, Toast, closeMainWindow, showHUD, showToast } from "@raycast/api";
+import { ReactNode, createContext, useContext, useState } from "react";
 import RootErrorBoundary from "~/components/RootErrorBoundary";
 import { MONTH_NUMBER_TO_LABEL_MAP, URI_MATCH_TYPE_TO_LABEL_MAP } from "~/constants/labels";
-import { BitwardenProvider } from "~/context/bitwarden";
+import { BitwardenProvider, useBitwarden } from "~/context/bitwarden";
 import { SessionProvider } from "~/context/session";
 import { useVault, VaultProvider } from "~/context/vault";
-import { Card, Identity, ItemType, Login, Uris } from "~/types/vault";
-import { Folder, Item } from "~/types/vault";
+import { Card, CreateItemPayload, Identity, ItemType, Login, Reprompt, Uris } from "~/types/vault";
+import { Folder } from "~/types/vault";
+import { captureException } from "~/utils/development";
 
-const SearchVaultCommand = () => (
+const initialItemState: CreateItemPayload = {
+  organizationId: null,
+  folderId: null,
+  type: ItemType.LOGIN,
+  reprompt: Reprompt.NO,
+  name: "",
+  notes: "",
+  favorite: false,
+  collectionIds: [],
+  fields: [],
+  login: null,
+  identity: null,
+  secureNote: null,
+  card: null,
+};
+
+type FormContextType = {
+  item: CreateItemPayload;
+  setField: <TField extends keyof CreateItemPayload>(
+    field: TField,
+    value: CreateItemPayload[TField] | ((value: CreateItemPayload[TField]) => CreateItemPayload[TField])
+  ) => void;
+  type: ItemType;
+  setType: (type: ItemType) => void;
+};
+
+const FormContext = createContext<FormContextType>({} as FormContextType);
+
+const FormProvider = ({ children }: { children: ReactNode }) => {
+  const [item, setItem] = useState<CreateItemPayload>(initialItemState);
+  const [type, setType] = useState<ItemType>(ItemType.LOGIN);
+
+  const setField: FormContextType["setField"] = (field, value) => {
+    setItem({ ...item, [field]: typeof value === "function" ? value(item[field]) : value });
+  };
+
+  return <FormContext.Provider value={{ item, type, setField, setType }}>{children}</FormContext.Provider>;
+};
+
+const useFormContext = () => {
+  const context = useContext(FormContext);
+  if (!context) throw new Error("useFormContext must be used within a FormProvider");
+
+  return context;
+};
+
+const CreateItemCommand = () => (
   <RootErrorBoundary>
     <BitwardenProvider>
       <SessionProvider unlock>
         <VaultProvider>
-          <CreateNewItemComponent />
+          <FormProvider>
+            <CreateNewItemComponent />
+          </FormProvider>
         </VaultProvider>
       </SessionProvider>
     </BitwardenProvider>
   </RootErrorBoundary>
 );
 
+const TYPE_TO_VALUE_MAP: Record<ItemType, string> = {
+  [ItemType.LOGIN]: "login",
+  [ItemType.NOTE]: "secureNote",
+  [ItemType.CARD]: "card",
+  [ItemType.IDENTITY]: "identity",
+};
+
+const NO_FOLDER_ID = "no-folder";
+
 function CreateNewItemComponent() {
-  const { folders } = useVault();
-  const [type, setType] = useState<ItemType>(ItemType.LOGIN);
+  const bitwarden = useBitwarden();
+  const { isLoading, folders } = useVault();
+  const { type, item, setField, setType } = useFormContext();
 
   const handleFieldChange =
-    <TField extends keyof Item>(field: TField) =>
-    (value: Item[TField]) => {
-      console.log(field, value);
+    <TField extends keyof CreateItemPayload>(field: TField) =>
+    (value: CreateItemPayload[TField]) => {
+      setField(field, value);
     };
 
   const handleTypeChange = (type: string) => {
@@ -36,36 +95,71 @@ function CreateNewItemComponent() {
 
   const handleRepromptChange = (value: boolean) => handleFieldChange("reprompt")(+value);
 
+  const handlerFolderChange = (value: string) => {
+    handleFieldChange("folderId")(value === NO_FOLDER_ID ? null : value);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await bitwarden.createItem(item);
+      await showHUD("Item created");
+      await closeMainWindow();
+    } catch (error) {
+      await showToast(Toast.Style.Failure, "Failed to create item");
+      captureException("Failed to create item", error);
+    }
+  };
+
   return (
-    <Form>
-      <Form.Dropdown id="type" title="Type" placeholder="Select a type" onChange={handleTypeChange}>
+    <Form
+      isLoading={isLoading}
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Save Item" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.Dropdown
+        id="type"
+        title="Type"
+        placeholder="Select a type"
+        value={TYPE_TO_VALUE_MAP[type]}
+        onChange={handleTypeChange}
+      >
         <Form.Dropdown.Item value="login" title="Login" />
         <Form.Dropdown.Item value="card" title="Card" />
         <Form.Dropdown.Item value="identity" title="Identity" />
         <Form.Dropdown.Item value="secureNote" title="Secure Note" />
       </Form.Dropdown>
       <Form.TextField id="name" title="Name" onChange={handleFieldChange("name")} />
-      <Form.Dropdown id="folder" title="Folder" placeholder="Select a folder" onChange={handleFieldChange("folderId")}>
+      <Form.Dropdown
+        id="folder"
+        title="Folder"
+        placeholder="Select a folder"
+        defaultValue={folders.length > 0 ? NO_FOLDER_ID : undefined}
+        onChange={handlerFolderChange}
+      >
         {folders.map((folder: Folder) => (
-          <Form.Dropdown.Item key={folder.id} value={folder.id} title={folder.name} />
+          <Form.Dropdown.Item key={folder.id} value={folder.id ?? NO_FOLDER_ID} title={folder.name} />
         ))}
       </Form.Dropdown>
-      {type === ItemType.LOGIN && <LoginForm onChange={handleFieldChange} />}
-      {type === ItemType.CARD && <CardForm onChange={handleFieldChange} />}
-      {type === ItemType.IDENTITY && <IdentityForm onChange={handleFieldChange} />}
+      {type === ItemType.LOGIN && <LoginForm />}
+      {type === ItemType.CARD && <CardForm />}
+      {type === ItemType.IDENTITY && <IdentityForm />}
       <Form.TextArea id="notes" title="Notes" onChange={handleFieldChange("notes")} />
       <Form.Checkbox id="reprompt" label="Master password re-prompt" onChange={handleRepromptChange} />
     </Form>
   );
 }
 
-function LoginForm({ onChange }: { onChange: (value: any) => void }) {
+function LoginForm() {
+  const { setField } = useFormContext();
   const [uri, setUri] = useState<Uris>({ uri: null, match: null });
 
   const handleFieldChange =
     <TField extends keyof Login>(field: TField) =>
     (value: Login[TField]) => {
-      onChange(field === "uris" ? [value] : value);
+      setField("login", (login) => ({ ...((login ?? {}) as Login), [field]: value }));
     };
 
   const handleUriChange =
@@ -96,11 +190,13 @@ function LoginForm({ onChange }: { onChange: (value: any) => void }) {
   );
 }
 
-function CardForm({ onChange }: { onChange: (field: any, value: any) => void }) {
+function CardForm() {
+  const { setField } = useFormContext();
+
   const handleFieldChange =
-    <O extends keyof Card>(field: O) =>
-    (value: string) => {
-      onChange(field, value);
+    <TField extends keyof Card>(field: TField) =>
+    (value: Card[TField]) => {
+      setField("card", (card) => ({ ...((card ?? {}) as Card), [field]: value }));
     };
 
   return (
@@ -119,11 +215,13 @@ function CardForm({ onChange }: { onChange: (field: any, value: any) => void }) 
   );
 }
 
-function IdentityForm({ onChange }: { onChange: (field: any, value: any) => void }) {
+function IdentityForm() {
+  const { setField } = useFormContext();
+
   const handleFieldChange =
-    <O extends keyof Identity>(field: O) =>
-    (value: string) => {
-      onChange(field, value);
+    <TField extends keyof Identity>(field: TField) =>
+    (value: Identity[TField]) => {
+      setField("identity", (identity) => ({ ...((identity ?? {}) as Identity), [field]: value }));
     };
 
   return (
@@ -149,4 +247,4 @@ function IdentityForm({ onChange }: { onChange: (field: any, value: any) => void
   );
 }
 
-export default SearchVaultCommand;
+export default CreateItemCommand;
