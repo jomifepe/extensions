@@ -6,13 +6,17 @@ import useAbortController from "~/utils/hooks/useAbortController";
 import { useBitwarden } from "~/context/bitwarden";
 import { getPasswordGeneratorOptions } from "~/utils/passwords";
 
-const initialPasswordGeneratorState = {
-  options: undefined as PasswordGeneratorOptions | undefined,
-  password: undefined as string | undefined,
-  isGenerating: true,
+type GeneratorState = {
+  options: PasswordGeneratorOptions | undefined;
+  password: string | undefined;
+  isGenerating: boolean;
 };
 
-type GeneratorState = typeof initialPasswordGeneratorState;
+const getInitialPasswordGeneratorState = (generateOnMount: boolean): GeneratorState => ({
+  options: undefined as PasswordGeneratorOptions | undefined,
+  password: undefined as string | undefined,
+  isGenerating: generateOnMount,
+});
 
 type GeneratorActions =
   | { type: "generate" }
@@ -36,17 +40,26 @@ const passwordReducer = (state: GeneratorState, action: GeneratorActions): Gener
   }
 };
 
-function usePasswordGenerator() {
+export type UsePasswordGeneratorOptions = {
+  generateOnMount: boolean;
+};
+
+function usePasswordGenerator(options?: UsePasswordGeneratorOptions) {
+  const { generateOnMount = true } = options ?? {};
   const bitwarden = useBitwarden();
-  const [{ options, ...state }, dispatch] = useReducer(passwordReducer, initialPasswordGeneratorState);
+  const [{ options: generatorOptions, ...state }, dispatch] = useReducer(
+    passwordReducer,
+    getInitialPasswordGeneratorState(generateOnMount)
+  );
   const { abortControllerRef, renew: renewAbortController, abort: abortPreviousGenerate } = useAbortController();
 
-  const generatePassword = async (passwordOptions = options) => {
+  const generatePassword = async (passwordOptions = generatorOptions) => {
     try {
       renewAbortController();
       dispatch({ type: "generate" });
       const password = await bitwarden.generatePassword(passwordOptions, abortControllerRef?.current);
       dispatch({ type: "setPassword", password });
+      return password;
     } catch (error) {
       // generate password was likely aborted
       if (abortControllerRef?.current.signal.aborted) {
@@ -57,19 +70,19 @@ function usePasswordGenerator() {
 
   const regeneratePassword = async () => {
     if (state.isGenerating) return;
-    await generatePassword();
+    return generatePassword();
   };
 
   const setOption = async <Option extends keyof PasswordGeneratorOptions>(
     option: Option,
     value: PasswordGeneratorOptions[Option]
   ) => {
-    if (!options || options[option] === value) return;
+    if (!generatorOptions || generatorOptions[option] === value) return;
     if (state.isGenerating) {
       abortPreviousGenerate();
     }
 
-    const newOptions = { ...options, [option]: value };
+    const newOptions = { ...generatorOptions, [option]: value };
     dispatch({ type: "setOptions", options: newOptions });
     await Promise.all([
       LocalStorage.setItem(LOCAL_STORAGE_KEY.PASSWORD_OPTIONS, JSON.stringify(newOptions)),
@@ -80,14 +93,14 @@ function usePasswordGenerator() {
   const restoreStoredOptions = async () => {
     const newOptions = await getPasswordGeneratorOptions();
     dispatch({ type: "setOptions", options: newOptions });
-    await generatePassword(newOptions);
+    if (generateOnMount) await generatePassword(newOptions);
   };
 
   useEffect(() => {
     void restoreStoredOptions();
   }, []);
 
-  return { ...state, regeneratePassword, options, setOption };
+  return { ...state, regeneratePassword, options: generatorOptions, setOption };
 }
 
 export default usePasswordGenerator;

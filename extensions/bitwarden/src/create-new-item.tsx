@@ -1,18 +1,19 @@
-import { Action, ActionPanel, Form, Toast, closeMainWindow, showHUD, showToast } from "@raycast/api";
+import { Action, ActionPanel, Form, Icon, Toast, closeMainWindow, showHUD, showToast } from "@raycast/api";
 import { useState } from "react";
 import RootErrorBoundary from "~/components/RootErrorBoundary";
 import { FormProvider, useForm } from "~/context/form";
 import { BitwardenProvider, useBitwarden } from "~/context/bitwarden";
 import { SessionProvider } from "~/context/session";
 import { useVault, VaultProvider } from "~/context/vault";
-import { CreateItemPayload, ItemType, Reprompt } from "~/types/vault";
+import { CreateItemPayload, ItemType, Login, Reprompt } from "~/types/vault";
 import { Folder } from "~/types/vault";
 import { captureException } from "~/utils/development";
 import LoginForm from "~/components/createVaultItem/LoginForm";
 import CardForm from "~/components/createVaultItem/CardForm";
 import IdentityForm from "~/components/createVaultItem/IdentityForm";
+import usePasswordGenerator from "~/utils/hooks/usePasswordGenerator";
 
-const defaultValues: CreateItemPayload = {
+const defaultValues = {
   organizationId: null,
   folderId: null,
   type: ItemType.LOGIN,
@@ -54,11 +55,14 @@ function CreateNewItemComponent() {
   const { isLoading, folders } = useVault();
   const [type, setType] = useState(ItemType.LOGIN);
   const formState = useForm<CreateItemPayload>({ defaultValues });
+  const { isGenerating: isGeneratingPassword, regeneratePassword } = usePasswordGenerator({ generateOnMount: false });
+
+  const { state, setField, handleSubmit } = formState;
 
   const handleFieldChange =
     <TField extends keyof CreateItemPayload>(field: TField) =>
     (value: CreateItemPayload[TField]) => {
-      formState.setField(field, value);
+      setField(field, value);
     };
 
   const handleTypeChange = (type: string) => {
@@ -82,13 +86,32 @@ function CreateNewItemComponent() {
     }
   };
 
+  const generateAndFillPassword = async () => {
+    const password = await regeneratePassword();
+    if (password) {
+      setField("login", (login) => ({
+        ...((login ?? {}) as Login),
+        username: null,
+        totp: null,
+        passwordRevisionDate: null,
+        password,
+      }));
+    }
+  };
+
   return (
     <FormProvider formState={formState}>
       <Form
-        isLoading={isLoading}
+        isLoading={isLoading || isGeneratingPassword}
         actions={
           <ActionPanel>
-            <Action.SubmitForm title="Save Item" onSubmit={formState.handleSubmit(submitForm)} />
+            <Action.SubmitForm title="Save Item" icon={Icon.SaveDocument} onSubmit={handleSubmit(submitForm)} />
+            <Action
+              title="Generate Password"
+              icon={Icon.Key}
+              onAction={generateAndFillPassword}
+              shortcut={{ modifiers: ["cmd"], key: "p" }}
+            />
           </ActionPanel>
         }
       >
@@ -104,12 +127,12 @@ function CreateNewItemComponent() {
           <Form.Dropdown.Item value="identity" title="Identity" />
           <Form.Dropdown.Item value="secureNote" title="Secure Note" />
         </Form.Dropdown>
-        <Form.TextField id="name" title="Name" onChange={handleFieldChange("name")} />
+        <Form.TextField id="name" title="Name" onChange={handleFieldChange("name")} value={state.name} />
         <Form.Dropdown
           id="folder"
           title="Folder"
           placeholder="Select a folder"
-          defaultValue={folders.length > 0 ? NO_FOLDER_ID : undefined}
+          value={state.folderId ?? folders.length > 0 ? NO_FOLDER_ID : undefined}
           onChange={handlerFolderChange}
         >
           {folders.map((folder: Folder) => (
@@ -119,8 +142,18 @@ function CreateNewItemComponent() {
         {type === ItemType.LOGIN && <LoginForm />}
         {type === ItemType.CARD && <CardForm />}
         {type === ItemType.IDENTITY && <IdentityForm />}
-        <Form.TextArea id="notes" title="Notes" onChange={handleFieldChange("notes")} />
-        <Form.Checkbox id="reprompt" label="Master password re-prompt" onChange={handleRepromptChange} />
+        <Form.TextArea
+          id="notes"
+          title="Notes"
+          onChange={handleFieldChange("notes")}
+          value={state.notes ?? defaultValues.notes}
+        />
+        <Form.Checkbox
+          id="reprompt"
+          label="Master password re-prompt"
+          onChange={handleRepromptChange}
+          value={state.reprompt === Reprompt.REQUIRED}
+        />
       </Form>
     </FormProvider>
   );

@@ -1,5 +1,5 @@
 import { VAULT_TIMEOUT } from "~/constants/preferences";
-import { UriMatch } from "~/types/vault";
+import { CardBrand, IdentityTitle, UriMatch } from "~/types/vault";
 
 export const MONTH_NUMBER_TO_LABEL_MAP = {
   1: "01 - January",
@@ -14,6 +14,27 @@ export const MONTH_NUMBER_TO_LABEL_MAP = {
   10: "10 - October",
   11: "11 - November",
   12: "12 - December",
+} as Record<string, string>;
+
+export const IDENTITY_TITLE_TO_LABEL_MAP = {
+  [IdentityTitle.MR]: "Mr",
+  [IdentityTitle.MRS]: "Mrs",
+  [IdentityTitle.MS]: "Ms",
+  [IdentityTitle.MX]: "Mx",
+  [IdentityTitle.DR]: "Dr",
+} as Record<string, string>;
+
+export const CARD_BRAND_TO_LABEL_MAP = {
+  [CardBrand.VISA]: "Visa",
+  [CardBrand.MASTERCARD]: "MasterCard",
+  [CardBrand.AMEX]: "American Express",
+  [CardBrand.DISCOVER]: "Discover",
+  [CardBrand.DINERS_CLUB]: "Diners Club",
+  [CardBrand.JCB]: "JCB",
+  [CardBrand.MAESTRO]: "Maestro",
+  [CardBrand.UNIONPAY]: "UnionPay",
+  [CardBrand.RUPAY]: "RuPay",
+  [CardBrand.OTHER]: "Other",
 } as Record<string, string>;
 
 export const VAULT_TIMEOUT_MS_TO_LABEL_MAP = {
