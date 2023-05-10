@@ -21,7 +21,7 @@ const UnlockForm = (props: UnlockFormProps) => {
   const lockReason = useRef(lockReasonProp ?? bitwarden.lockReason).current;
   const [unlockError, setUnlockError] = useState<string | undefined>(undefined);
 
-  async function onSubmit({ password }: { password: string }) {
+  async function onSubmit({ masterPassword: password }: { masterPassword: string }) {
     if (password.length === 0) return;
 
     const toast = await showToast(Toast.Style.Animated, "Unlocking Vault...", "Please wait");
@@ -88,7 +88,7 @@ const UnlockForm = (props: UnlockFormProps) => {
     >
       {shouldShowServer && <Form.Description title="Server URL" text={serverMessage} />}
       <Form.Description title="Vault Status" text={userMessage} />
-      <Form.PasswordField autoFocus id="password" title="Master Password" />
+      <Form.PasswordField autoFocus id="masterPassword" title="Master Password" />
       {!!lockReason && (
         <>
           <Form.Description title="ℹ️" text={lockReason} />

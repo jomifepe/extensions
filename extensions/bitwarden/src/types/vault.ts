@@ -26,16 +26,16 @@ export interface Item {
   name: string;
   notes: string | null;
   favorite: boolean;
-  login?: Login;
+  login?: Login | null;
   collectionIds: string[];
   revisionDate: string;
   creationDate: string;
   deletedDate: string | null;
-  identity?: Identity;
+  identity?: Identity | null;
   fields?: Field[];
   passwordHistory?: PasswordHistory[];
-  secureNote?: SecureNote;
-  card?: Card;
+  secureNote?: SecureNote | null;
+  card?: Card | null;
 }
 
 export enum ItemType {
