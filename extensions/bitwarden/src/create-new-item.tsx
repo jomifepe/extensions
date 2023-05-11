@@ -90,10 +90,10 @@ function CreateNewItemComponent() {
     const password = await regeneratePassword();
     if (password) {
       setField("login", (login) => ({
-        ...((login ?? {}) as Login),
         username: null,
         totp: null,
         passwordRevisionDate: null,
+        ...login,
         password,
       }));
     }
