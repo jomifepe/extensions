@@ -183,7 +183,7 @@
     },
     {
       "name": "enable-fingerprint",
-      "title": "Enable Fingerprint Authentication",
+      "title": "Enable/Disable Fingerprint Authentication",
       "subtitle": "Bitwarden",
       "description": "Allow to use fingerprint authentication to unlock your vault",
       "icon": "logout-vault.png",
