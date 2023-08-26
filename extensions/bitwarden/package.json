@@ -180,6 +180,18 @@
         "log out",
         "account"
       ]
+    },
+    {
+      "name": "enable-fingerprint",
+      "title": "Enable Fingerprint Authentication",
+      "subtitle": "Bitwarden",
+      "description": "Allow to use fingerprint authentication to unlock your vault",
+      "icon": "logout-vault.png",
+      "mode": "no-view",
+      "keywords": [
+        "fingerprint",
+        "biometric"
+      ]
     }
   ],
   "preferences": [
