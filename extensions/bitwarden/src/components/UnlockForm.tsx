@@ -1,8 +1,22 @@
-import { Action, ActionPanel, Clipboard, Form, getPreferenceValues, Icon, showToast, Toast } from "@raycast/api";
-import { useRef, useState } from "react";
+import {
+  Action,
+  ActionPanel,
+  Clipboard,
+  Form,
+  getPreferenceValues,
+  Icon,
+  LocalStorage,
+  showToast,
+  Toast,
+} from "@raycast/api";
+import { useEffect, useRef, useState } from "react";
+import { LOCAL_STORAGE_KEY } from "~/constants/general";
 import { useBitwarden } from "~/context/bitwarden";
 import { treatError } from "~/utils/debug";
 import { captureException } from "~/utils/development";
+import { promptForFingerprint } from "~/utils/fingerprint";
+import { useAsyncEffect } from "~/utils/hooks/useAsyncEffect";
+import useOnceEffect from "~/utils/hooks/useOnceEffect";
 import useVaultMessages from "~/utils/hooks/useVaultMessages";
 import { getLabelForTimeoutPreference } from "~/utils/preferences";
 
@@ -19,6 +33,17 @@ const UnlockForm = (props: UnlockFormProps) => {
   const { userMessage, serverMessage, shouldShowServer } = useVaultMessages();
   const lockReason = useRef(lockReasonProp ?? bitwarden.lockReason).current;
   const [unlockError, setUnlockError] = useState<string | undefined>(undefined);
+
+  useAsyncEffect(async () => {
+    const storedFingerprintHash = await LocalStorage.getItem<string>(LOCAL_STORAGE_KEY.FINGERPRINT_HASH);
+    console.log({ storedFingerprintHash });
+    if (!storedFingerprintHash) return;
+    const fingerprintHash = await promptForFingerprint();
+    console.log({ fingerprintHash });
+    if (fingerprintHash === storedFingerprintHash) {
+      props.onUnlockWithFingerprint();
+    }
+  }, []);
 
   async function onSubmit({ password }: { password: string }) {
     if (password.length === 0) return;
@@ -66,14 +91,14 @@ const UnlockForm = (props: UnlockFormProps) => {
     <Form
       actions={
         <ActionPanel>
-          {!isLoading && (
-            <Action.SubmitForm
-              icon={Icon.LockUnlocked}
-              title="Unlock"
-              onSubmit={onSubmit}
-              shortcut={{ key: "enter", modifiers: [] }}
-            />
-          )}
+          {/* {!isLoading && ( */}
+          <Action.SubmitForm
+            icon={Icon.LockUnlocked}
+            title="Unlock"
+            onSubmit={onSubmit}
+            shortcut={{ key: "enter", modifiers: [] }}
+          />
+          {/* )} */}
           {!!unlockError && (
             <Action
               onAction={copyUnlockError}

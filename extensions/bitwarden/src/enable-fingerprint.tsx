@@ -61,4 +61,5 @@ async function promptForFingerprint() {
     captureException("Failed to get fingerprint data", error);
   }
 }
+
 export default enableFingerprintCommand;

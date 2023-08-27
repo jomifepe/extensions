@@ -1,6 +1,8 @@
+import { LocalStorage } from "@raycast/api";
 import { createContext, PropsWithChildren, useContext, useMemo } from "react";
 import UnlockForm from "~/components/UnlockForm";
 import { VaultLoadingFallback } from "~/components/searchVault/VaultLoadingFallback";
+import { LOCAL_STORAGE_KEY } from "~/constants/general";
 import { useBitwarden } from "~/context/bitwarden";
 import { useSessionReducer } from "~/context/session/reducer";
 import { getSavedSession, SessionStorage } from "~/context/session/utils";
@@ -43,7 +45,13 @@ export function SessionProvider(props: SessionProviderProps) {
       const restoredSession = await getSavedSession();
       if (restoredSession.token) bitwarden.setSessionToken(restoredSession.token);
       dispatch({ type: "loadSavedState", ...restoredSession });
-      if (restoredSession.shouldLockVault) await bitwarden.lock(restoredSession.lockReason, true);
+      if (restoredSession.shouldLockVault) {
+        if (await hasFingerprint()) {
+          dispatch({ type: "lockWithFingerprint", lockReason: restoredSession.lockReason });
+        } else {
+          dispatch({ type: "lock", lockReason: restoredSession.lockReason });
+        }
+      }
     } catch (error) {
       if (!(error instanceof VaultIsLockedError)) await bitwarden.lock();
       dispatch({ type: "failedLoadSavedState" });
@@ -55,6 +63,10 @@ export function SessionProvider(props: SessionProviderProps) {
     const passwordHash = await hashMasterPasswordForReprompting(password);
     await SessionStorage.saveSession(token, passwordHash);
     dispatch({ type: "unlock", token, passwordHash });
+  }
+
+  async function handleUnlockWithFingerprint() {
+    dispatch({ type: "unlockWithFingerprint" });
   }
 
   async function handleLock(reason?: string) {
@@ -88,10 +100,15 @@ export function SessionProvider(props: SessionProviderProps) {
   if (state.isLoading) return <VaultLoadingFallback />;
 
   const showUnlockForm = state.isLocked || !state.isAuthenticated;
+  console.log({ showUnlockForm });
   const children = state.token ? props.children : null;
   return (
     <SessionContext.Provider value={contextValue}>
-      {showUnlockForm && props.unlock ? <UnlockForm lockReason={state.lockReason} /> : children}
+      {showUnlockForm && props.unlock ? (
+        <UnlockForm lockReason={state.lockReason} onUnlockWithFingerprint={handleUnlockWithFingerprint} />
+      ) : (
+        children
+      )}
     </SessionContext.Provider>
   );
 }
@@ -103,4 +120,9 @@ export function useSession(): Session {
   }
 
   return session;
+}
+
+async function hasFingerprint() {
+  const hash = await LocalStorage.getItem<string>(LOCAL_STORAGE_KEY.FINGERPRINT_HASH);
+  return !!(hash && hash.length > 0);
 }

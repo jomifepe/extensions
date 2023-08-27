@@ -13,7 +13,9 @@ const initialState: SessionState = {
 
 type SessionReducerActions =
   | { type: "lock"; lockReason?: string }
+  | { type: "lockWithFingerprint"; lockReason?: string }
   | { type: "unlock"; token: string; passwordHash: string }
+  | { type: "unlockWithFingerprint" }
   | { type: "logout" }
   | { type: "vaultTimeout" }
   | {
@@ -39,11 +41,27 @@ export const useSessionReducer = () => {
           lockReason: action.lockReason,
         };
       }
+      case "lockWithFingerprint": {
+        return {
+          ...state,
+          isLoading: false,
+          isLocked: true,
+          lockReason: action.lockReason,
+        };
+      }
       case "unlock": {
         return {
           ...state,
           token: action.token,
           passwordHash: action.passwordHash,
+          isLocked: false,
+          isAuthenticated: true,
+          lockReason: undefined,
+        };
+      }
+      case "unlockWithFingerprint": {
+        return {
+          ...state,
           isLocked: false,
           isAuthenticated: true,
           lockReason: undefined,
