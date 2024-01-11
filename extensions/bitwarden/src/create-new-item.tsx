@@ -4,7 +4,7 @@ import RootErrorBoundary from "~/components/RootErrorBoundary";
 import { MONTH_NUMBER_TO_LABEL_MAP, URI_MATCH_TYPE_TO_LABEL_MAP } from "~/constants/labels";
 import { BitwardenProvider } from "~/context/bitwarden";
 import { SessionProvider } from "~/context/session";
-import { useVault, VaultProvider } from "~/context/vault";
+import { VaultProvider, useVaultContext } from "~/context/vault";
 import { Card, Identity, ItemType, Login, Uris } from "~/types/vault";
 import { Folder, Item } from "~/types/vault";
 
@@ -21,7 +21,7 @@ const SearchVaultCommand = () => (
 );
 
 function CreateNewItemComponent() {
-  const { folders } = useVault();
+  const { folders } = useVaultContext();
   const [type, setType] = useState<ItemType>(ItemType.LOGIN);
 
   const handleFieldChange =
