@@ -36,6 +36,7 @@ type ActionCallbacks = {
   logout?: () => MaybePromise<void>;
   lock?: (reason?: string) => MaybePromise<void>;
   unlock?: (password: string, sessionToken: string) => MaybePromise<void>;
+  cliUpdate?: () => void;
 };
 
 type MaybeError<T = undefined> = { result: T; error?: undefined } | { result?: undefined; error: ManuallyThrownError };
@@ -93,13 +94,13 @@ export const cliInfo = {
 
 export class Bitwarden {
   private env: Env;
-  private isInitialized = false;
   private initPromise: Promise<void>;
   private tempSessionToken?: string;
   private callbacks: ActionCallbacks = {};
   private preferences = getPreferenceValues<Preferences>();
   private cliPath: string;
   private toastInstance: Toast | undefined;
+  wasCliUpdated = false;
   lockReason: string | undefined;
 
   constructor(toastInstance?: Toast) {
@@ -162,6 +163,9 @@ export class Bitwarden {
         throw extractError;
       }
       await toast.hide();
+      await this.logout();
+      this.wasCliUpdated = true;
+      this.callbacks.cliUpdate?.();
     } catch (error) {
       toast.message = error instanceof EnsureCliBinError ? error.message : "Please try again";
       toast.style = Toast.Style.Failure;
@@ -209,7 +213,6 @@ export class Bitwarden {
 
   async initialize(): Promise<this> {
     await this.initPromise;
-    this.isInitialized = true;
     return this;
   }
 
@@ -263,8 +266,6 @@ export class Bitwarden {
   }
 
   private async exec(args: string[], options: ExecProps): Promise<ExecaChildProcess> {
-    if (!this.isInitialized) throw new Error("Bitwarden not initialized");
-
     const { abortController, input = "", resetVaultTimeout } = options ?? {};
 
     let env = this.env;

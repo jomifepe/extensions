@@ -38,12 +38,25 @@ export function SessionProvider(props: SessionProviderProps) {
       bitwarden
         .setActionCallback("lock", handleLock)
         .setActionCallback("unlock", handleUnlock)
-        .setActionCallback("logout", handleLogout);
+        .setActionCallback("logout", handleLogout)
+        .setActionCallback("cliUpdate", handleCliUpdate);
 
       const restoredSession = await getSavedSession();
       if (restoredSession.token) bitwarden.setSessionToken(restoredSession.token);
+
+      if (bitwarden.wasCliUpdated) {
+        // TODO: shouldn't be needed as we have a callback, try to remove this in a future release
+        await handleLogout();
+        await bitwarden.logout();
+        return;
+      }
+
       dispatch({ type: "loadSavedState", ...restoredSession });
-      if (restoredSession.shouldLockVault) await bitwarden.lock(restoredSession.lockReason, true);
+      if (restoredSession.shouldLockVault) {
+        // TODO: shouldn't be needed as we have a callback, try to remove this in a future release
+        await handleLock(restoredSession.lockReason);
+        await bitwarden.lock(restoredSession.lockReason, true);
+      }
     } catch (error) {
       if (!(error instanceof VaultIsLockedError)) await bitwarden.lock();
       dispatch({ type: "failedLoadSavedState" });
@@ -66,6 +79,11 @@ export function SessionProvider(props: SessionProviderProps) {
     await SessionStorage.clearSession();
     Cache.clear();
     dispatch({ type: "logout" });
+  }
+
+  async function handleCliUpdate() {
+    await bitwarden.logout();
+    await handleLogout();
   }
 
   async function confirmMasterPassword(password: string): Promise<boolean> {
