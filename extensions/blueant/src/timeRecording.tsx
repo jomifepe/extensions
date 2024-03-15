@@ -1,16 +1,33 @@
 import { Form, ActionPanel, Action, showToast } from "@raycast/api";
+import { FormValidation, useForm } from "@raycast/utils";
 
-type Values = {
-  textfield: string;
-  textarea: string;
-  datepicker: Date;
-  checkbox: boolean;
-  dropdown: string;
-  tokeneditor: string[];
+type FormValues = {
+  date: Date | null;
+  duration: string;
+  client: string;
+  project: string;
+  activity: string;
+  location: string;
+  comment: string;
+  isBillable: boolean;
 };
 
-export default function Command() {
-  function handleSubmit(values: Values) {
+export default function TimeRecordingCommand() {
+  const { itemProps } = useForm<FormValues>({
+    onSubmit,
+    validation: {
+      date: FormValidation.Required,
+      duration: FormValidation.Required,
+      client: FormValidation.Required,
+      project: FormValidation.Required,
+      activity: FormValidation.Required,
+      location: FormValidation.Required,
+      comment: FormValidation.Required,
+      isBillable: FormValidation.Required,
+    },
+  });
+
+  function onSubmit(values: FormValues) {
     console.log(values);
     showToast({ title: "Submitted form", message: "See logs for submitted values" });
   }
@@ -19,22 +36,30 @@ export default function Command() {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm onSubmit={handleSubmit} />
+          <Action.SubmitForm onSubmit={onSubmit} />
         </ActionPanel>
       }
     >
-      <Form.Description text="This form showcases all available form elements." />
-      <Form.TextField id="textfield" title="Text field" placeholder="Enter text" defaultValue="Raycast" />
-      <Form.TextArea id="textarea" title="Text area" placeholder="Enter multi-line text" />
-      <Form.Separator />
-      <Form.DatePicker id="datepicker" title="Date picker" />
-      <Form.Checkbox id="checkbox" title="Checkbox" label="Checkbox Label" storeValue />
-      <Form.Dropdown id="dropdown" title="Dropdown">
-        <Form.Dropdown.Item value="dropdown-item" title="Dropdown Item" />
+      <Form.DatePicker title="Date" {...itemProps.date} />
+      <Form.TextField title="Duration" {...itemProps.duration} />
+      <Form.TextField title="Client" {...itemProps.client} />
+      <Form.TextField title="Project" {...itemProps.project} />
+      <Form.TextField title="Activity" {...itemProps.activity} />
+      <Form.Dropdown title="Location" {...itemProps.location}>
+        <Form.Dropdown.Item value="v280167775" title="on site" />
+        <Form.Dropdown.Item value="v367750664" title="Office Cologne" />
+        <Form.Dropdown.Item value="v367750930" title="Office Stuttgart" />
+        <Form.Dropdown.Item value="v367750666" title="Office Munich" />
+        <Form.Dropdown.Item value="v367750932" title="Office Berlin" />
+        <Form.Dropdown.Item value="v367750935" title="Office Lisbon" />
+        <Form.Dropdown.Item value="v488880998" title="Office Leiria" />
+        <Form.Dropdown.Item value="v671179242" title="Office Zurich" />
+        <Form.Dropdown.Item value="v367750938" title="Home Office" />
+        <Form.Dropdown.Item value="v1707923031" title="Office Viseu" />
+        <Form.Dropdown.Item value="v1831935122" title="Office Frankfurt" />
       </Form.Dropdown>
-      <Form.TagPicker id="tokeneditor" title="Tag picker">
-        <Form.TagPicker.Item value="tagpicker-item" title="Tag Picker Item" />
-      </Form.TagPicker>
+      <Form.TextArea title="Comment" {...itemProps.comment} />
+      <Form.Checkbox label="Billable" {...itemProps.isBillable} />
     </Form>
   );
 }
