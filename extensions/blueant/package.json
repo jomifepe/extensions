@@ -21,16 +21,26 @@
     {
       "type": "textfield",
       "required": true,
+      "name": "domain",
+      "title": "Domain",
+      "description": "Your BlueAnt domain",
+      "placeholder": "your.blueant.cloud"
+    },
+    {
+      "type": "textfield",
+      "required": true,
       "name": "username",
       "title": "Username",
-      "description": "Your BlueAnt username"
+      "description": "Your BlueAnt username",
+      "placeholder": "itsme@mario.com"
     },
     {
       "type": "password",
       "required": true,
       "name": "password",
       "title": "Password",
-      "description": "Your BlueAnt password"
+      "description": "Your BlueAnt password",
+      "placeholder": "verysecretpassword"
     }
   ],
   "dependencies": {
