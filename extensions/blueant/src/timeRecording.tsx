@@ -1,6 +1,20 @@
 import { Form, ActionPanel, Action, showToast } from "@raycast/api";
 import { FormValidation, useForm } from "@raycast/utils";
 
+const locationOptions = [
+  { value: "v280167775", title: "on site" },
+  { value: "v367750664", title: "Office Cologne" },
+  { value: "v367750930", title: "Office Stuttgart" },
+  { value: "v367750666", title: "Office Munich" },
+  { value: "v367750932", title: "Office Berlin" },
+  { value: "v367750935", title: "Office Lisbon" },
+  { value: "v488880998", title: "Office Leiria" },
+  { value: "v671179242", title: "Office Zurich" },
+  { value: "v367750938", title: "Home Office" },
+  { value: "v1707923031", title: "Office Viseu" },
+  { value: "v1831935122", title: "Office Frankfurt" },
+] as const;
+
 type FormValues = {
   date: Date | null;
   duration: string;
@@ -12,9 +26,22 @@ type FormValues = {
   isBillable: boolean;
 };
 
+const initialValues: FormValues = {
+  // Date with 1 millisecond means 'Today' in raycast DatePicker
+  date: new Date(new Date().setHours(0, 0, 0, 1)),
+  duration: "08:00",
+  client: "",
+  project: "",
+  activity: "",
+  location: "",
+  comment: "",
+  isBillable: false,
+};
+
 export default function TimeRecordingCommand() {
-  const { itemProps } = useForm<FormValues>({
+  const { itemProps, handleSubmit } = useForm<FormValues>({
     onSubmit,
+    initialValues,
     validation: {
       date: FormValidation.Required,
       duration: FormValidation.Required,
@@ -36,27 +63,19 @@ export default function TimeRecordingCommand() {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm onSubmit={onSubmit} />
+          <Action.SubmitForm onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
       <Form.DatePicker title="Date" {...itemProps.date} />
-      <Form.TextField title="Duration" {...itemProps.duration} />
-      <Form.TextField title="Client" {...itemProps.client} />
-      <Form.TextField title="Project" {...itemProps.project} />
-      <Form.TextField title="Activity" {...itemProps.activity} />
-      <Form.Dropdown title="Location" {...itemProps.location}>
-        <Form.Dropdown.Item value="v280167775" title="on site" />
-        <Form.Dropdown.Item value="v367750664" title="Office Cologne" />
-        <Form.Dropdown.Item value="v367750930" title="Office Stuttgart" />
-        <Form.Dropdown.Item value="v367750666" title="Office Munich" />
-        <Form.Dropdown.Item value="v367750932" title="Office Berlin" />
-        <Form.Dropdown.Item value="v367750935" title="Office Lisbon" />
-        <Form.Dropdown.Item value="v488880998" title="Office Leiria" />
-        <Form.Dropdown.Item value="v671179242" title="Office Zurich" />
-        <Form.Dropdown.Item value="v367750938" title="Home Office" />
-        <Form.Dropdown.Item value="v1707923031" title="Office Viseu" />
-        <Form.Dropdown.Item value="v1831935122" title="Office Frankfurt" />
+      <Form.TextField title="Duration" {...itemProps.duration} storeValue />
+      <Form.TextField title="Client" {...itemProps.client} storeValue />
+      <Form.TextField title="Project" {...itemProps.project} storeValue />
+      <Form.TextField title="Activity" {...itemProps.activity} storeValue />
+      <Form.Dropdown title="Location" {...itemProps.location} storeValue>
+        {locationOptions.map((option) => (
+          <Form.Dropdown.Item key={option.value} {...option} />
+        ))}
       </Form.Dropdown>
       <Form.TextArea title="Comment" {...itemProps.comment} />
       <Form.Checkbox label="Billable" {...itemProps.isBillable} />

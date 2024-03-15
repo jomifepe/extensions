@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "blueant",
-  "title": "BlueAnt",
+  "title": "Blue Ant",
   "description": "Log your hours in BlueAnt from Raycast",
   "icon": "command-icon.png",
   "author": "jomifepe",
