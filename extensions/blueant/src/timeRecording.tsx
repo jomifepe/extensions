@@ -9,8 +9,9 @@ import {
   open,
   showToast,
 } from "@raycast/api";
-import { FormValidation, useForm } from "@raycast/utils";
+import { FormValidation, useCachedPromise, useCachedState, useForm, usePromise } from "@raycast/utils";
 import puppeteer, { Browser, ElementHandle, Frame, Page } from "puppeteer";
+import { useState } from "react";
 
 const locationOptions = [
   "on site",
@@ -34,6 +35,7 @@ type FormValues = {
   activity: string;
   location: string;
   comment: string;
+  shouldPrefillComment: boolean;
 };
 
 type SubmittedFormValues = {
@@ -49,14 +51,22 @@ const initialValues: FormValues = {
   activity: "",
   location: "",
   comment: "",
+  shouldPrefillComment: false,
 };
 
 const cache = new Cache({ namespace: environment.commandName });
 
+const cachePreviousMessage = (date: string, message: string) => {
+  cache.set('previousComment', date + message);
+}
+
+const getCachedPreviousMessage = () => {
+  return cache.get('previousComment')?.substring(10);
+}
+
 const getInitialValues = (): FormValues => {
   const cachedValuesString = cache.get("timeRecordingFormValues");
   try {
-    console.log({ cachedValuesString });
     const cachedValues = cachedValuesString ? JSON.parse(cachedValuesString) : {};
     return { ...initialValues, ...cachedValues };
   } catch {
@@ -69,8 +79,10 @@ const cacheValues = (values: FormValues) => {
   cache.set("timeRecordingFormValues", JSON.stringify(cacheableValues));
 };
 
+const leadingZero = (value: number) => (value < 10 ? `0${value}` : value);
+
 const getRecordingTime = (date: Date) => {
-  return [date.getDate(), date.getMonth() + 1, date.getFullYear()].join(".");
+  return [leadingZero(date.getDate()), leadingZero(date.getMonth() + 1), date.getFullYear()].join(".");
 };
 
 const clearInput = async (page: Page, element: ElementHandle, amount: number) => {
@@ -79,6 +91,12 @@ const clearInput = async (page: Page, element: ElementHandle, amount: number) =>
     await page.keyboard.press("Delete");
   }
 };
+
+function delay(time: number) {
+  return new Promise(function(resolve) { 
+      setTimeout(resolve, time)
+  });
+}
 
 const selectOptionByLabel = async (page: Page, content: Frame, label: string, value: string) => {
   const selectContainer = await content.waitForSelector(
@@ -159,8 +177,64 @@ const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
   }
 };
 
+const getPreviousDayComment = async () => {
+  let browser: Browser | undefined;
+  let page: Page | undefined;
+  try {
+    const { domain, username, password } = getPreferenceValues<Preferences>();
+
+    browser = await puppeteer.launch({ headless: false });
+    page = await browser.newPage();
+    await page.goto(`https://${domain}/psap?p=TimeRecording&t=0`);
+    await page.setViewport({ width: 1080, height: 800 });
+
+    await page.type('[name="MT_BENUTZERNAME"]', username);
+    await page.type('[name="MT_Kennwort"]', password);
+    await page.click('input[type="submit"]');
+
+    const iframe = await page.waitForSelector("#rootcontent > iframe");
+    const content = await iframe?.contentFrame();
+    if (!content) throw new Error("Frame not found");
+
+    const dateInput = await content.waitForSelector('[name="datum"]', { timeout: 10000 });
+    if (!dateInput) throw new Error("Could not find date input field");
+
+    await clearInput(page, dateInput, 10);
+    const previousDay = new Date();
+    previousDay.setDate(previousDay.getDate() - 1);
+    const previousDayDateString = getRecordingTime(previousDay);
+    await dateInput.type(previousDayDateString, { delay: 10 });
+
+    await page.keyboard.press('Tab', { delay: 1000 });
+
+    await content.click('.caption_worktime .table .tbody > .tr:last-child a[title="Copy work-time"]', { delay: 100 });
+
+    await delay(2000);
+
+    const previousMessage = await content.evaluate(() => {
+      const copyText = document.querySelector('[name="bemerkung1000"]') as HTMLInputElement;
+      return copyText.value;
+    });
+
+    if (cachePreviousMessage) {
+      cachePreviousMessage(previousDayDateString, previousMessage);
+    }
+
+    return previousMessage;
+  } catch (error) {
+    environment.isDevelopment && console.error(error);
+    const screenshotPath = `${environment.supportPath}/time-recording-get-previous-day-comment-error.png`;
+    const screenshot = await page?.screenshot({ path: screenshotPath });
+    if (screenshot) open(screenshotPath);
+
+    throw new Error("Failed to get previous day's comment");
+  } finally {
+    await browser?.close();
+  }
+}
+
 export default function TimeRecordingCommand() {
-  const { itemProps, handleSubmit } = useForm<FormValues>({
+  const { itemProps, handleSubmit, setValue } = useForm<FormValues>({
     onSubmit: async (values) => {
       cacheValues(values);
       return onSubmit(values as SubmittedFormValues);
@@ -176,6 +250,30 @@ export default function TimeRecordingCommand() {
       comment: FormValidation.Required,
     },
   });
+
+  const [isPrefillingComment, setIsPrefillingComment] = useState(false);
+
+  const handleShouldPrefillCommentChange = async (checked: boolean) => {
+    itemProps.shouldPrefillComment.onChange?.(checked);
+    if (checked) {
+      setIsPrefillingComment(true);
+      const cachedPreviousComment = getCachedPreviousMessage();
+      if (cachedPreviousComment) {
+        setValue('comment', cachedPreviousComment);
+      } else {
+        const toast = await showToast({ style: Toast.Style.Animated, title: "Pre-filling comment..." });
+        try {
+          const previousDayComment = await getPreviousDayComment();
+          setValue('comment', previousDayComment);
+          await toast.hide();
+        } catch {
+          toast.title = "Failed to pre-fill comment";
+          toast.style = Toast.Style.Failure;
+        }
+      }
+      setIsPrefillingComment(false);
+    }
+  }
 
   async function onSubmit(values: SubmittedFormValues) {
     const toast = await showToast({ style: Toast.Style.Animated, title: "Recording time...", message: "Please wait" });
@@ -194,25 +292,29 @@ export default function TimeRecordingCommand() {
     }
   }
 
+  const isLoading = isPrefillingComment;
+
   return (
     <Form
+      isLoading={isLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm onSubmit={handleSubmit} />
         </ActionPanel>
       }
     >
-      <Form.DatePicker title="Date" {...itemProps.date} />
-      <Form.TextField title="Duration" {...itemProps.duration} storeValue />
-      <Form.TextField title="Client" {...itemProps.client} storeValue />
-      <Form.TextField title="Project" {...itemProps.project} storeValue />
-      <Form.TextField title="Activity" {...itemProps.activity} storeValue />
-      <Form.Dropdown title="Location" {...itemProps.location} storeValue>
+      <Form.DatePicker {...itemProps.date} title="Date"  />
+      <Form.TextField {...itemProps.duration} title="Duration"  storeValue />
+      <Form.TextField {...itemProps.client} title="Client"  storeValue />
+      <Form.TextField {...itemProps.project} title="Project"  storeValue />
+      <Form.TextField {...itemProps.activity} title="Activity"  storeValue />
+      <Form.Dropdown {...itemProps.location} title="Location"  storeValue>
         {locationOptions.map((option) => (
           <Form.Dropdown.Item key={option} value={option} title={option} />
         ))}
       </Form.Dropdown>
-      <Form.TextArea title="Comment" {...itemProps.comment} />
+      <Form.TextArea {...itemProps.comment} title="Comment"  />
+      <Form.Checkbox {...itemProps.shouldPrefillComment} label="Pre-fill with previous day's comment" onChange={handleShouldPrefillCommentChange} />
     </Form>
   );
 }
