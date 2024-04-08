@@ -3,6 +3,7 @@ import {
   ActionPanel,
   Cache,
   Form,
+  Icon,
   Toast,
   environment,
   getPreferenceValues,
@@ -11,7 +12,6 @@ import {
 } from "@raycast/api";
 import { FormValidation, useForm } from "@raycast/utils";
 import puppeteer, { ElementHandle, Frame, Page } from "puppeteer";
-import { useState } from "react";
 
 const { domain, username, password } = getPreferenceValues<Preferences>();
 
@@ -234,8 +234,8 @@ const getPreviousDayComment = async (toast?: Toast) => {
     );
     await delay(500); // for some reason the button appears but isn't clickable yet
     if (!duplicatePreviousDayButton) throw new Error("Could not find duplicate previous day button");
-    await duplicatePreviousDayButton.click({ delay: 100 }); // select the previous day
 
+    await duplicatePreviousDayButton.click({ delay: 100 }); // select the previous day
     await delay(2000);
 
     const previousMessage = await content.evaluate(() => {
@@ -243,9 +243,7 @@ const getPreviousDayComment = async (toast?: Toast) => {
       return copyText.value;
     });
 
-    if (cachePreviousComment) {
-      cachePreviousComment(previousMessage);
-    }
+    if (cachePreviousComment) cachePreviousComment(previousMessage);
 
     return previousMessage;
   } catch (error) {
@@ -262,7 +260,6 @@ const getPreviousDayComment = async (toast?: Toast) => {
 };
 
 export default function TimeRecordingCommand() {
-  const [shouldPrefillComment, setShouldPrefillComment] = useState(false);
   const { itemProps, handleSubmit, setValue } = useForm<FormValues>({
     onSubmit: async (values) => {
       cacheValues(values);
@@ -280,24 +277,20 @@ export default function TimeRecordingCommand() {
     },
   });
 
-  const handleShouldPrefillCommentChange = async (checked: boolean) => {
-    setShouldPrefillComment(checked);
-    if (checked) {
-      const cachedPreviousComment = getCachedPreviousComment();
-      if (cachedPreviousComment) {
-        setValue("comment", cachedPreviousComment);
-      } else {
-        const toast = await showToast({ style: Toast.Style.Animated, title: "Pre-filling comment..." });
-        try {
-          const previousDayComment = await getPreviousDayComment(toast);
-          setValue("comment", previousDayComment);
-          setShouldPrefillComment(false);
-          await toast.hide();
-        } catch (error) {
-          environment.isDevelopment && console.error(error);
-          toast.title = "Failed to pre-fill comment";
-          toast.style = Toast.Style.Failure;
-        }
+  const getPrefillCommentHandler = (shouldForce = false) => async () => {
+    const cachedPreviousComment = getCachedPreviousComment();
+    if (cachedPreviousComment && !shouldForce) {
+      setValue("comment", cachedPreviousComment);
+    } else {
+      const toast = await showToast({ style: Toast.Style.Animated, title: "Pre-filling comment..." });
+      try {
+        const previousDayComment = await getPreviousDayComment(toast);
+        setValue("comment", previousDayComment);
+        await toast.hide();
+      } catch (error) {
+        environment.isDevelopment && console.error(error);
+        toast.title = "Failed to pre-fill comment";
+        toast.style = Toast.Style.Failure;
       }
     }
   };
@@ -323,7 +316,9 @@ export default function TimeRecordingCommand() {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm onSubmit={handleSubmit} />
+          <Action.SubmitForm title="Save Time Recording" onSubmit={handleSubmit} icon={Icon.SaveDocument} />
+          <Action title="Prefill Last Day's Comment" onAction={getPrefillCommentHandler()} icon={Icon.TextCursor} />
+          <Action title="Prefill Last Day's Comment (Force)" onAction={getPrefillCommentHandler(true)} icon={Icon.TextCursor} />
         </ActionPanel>
       }
     >
@@ -338,12 +333,6 @@ export default function TimeRecordingCommand() {
         ))}
       </Form.Dropdown>
       <Form.TextArea {...itemProps.comment} title="Comment" />
-      <Form.Checkbox
-        id="shouldPrefillComment"
-        label="Pre-fill with previous day's comment"
-        value={shouldPrefillComment}
-        onChange={handleShouldPrefillCommentChange}
-      />
     </Form>
   );
 }
