@@ -125,7 +125,10 @@ export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: F
     initialValues: getInitialValues(props.draftValues),
     validation: {
       date: FormValidation.Required,
-      duration: FormValidation.Required,
+      duration: (value) => {
+        if (!value) return "Duration is required";
+        if (!/^\d{2}:\d{2}$/.test(value)) return "Must be in HH:MM format";
+      },
       client: FormValidation.Required,
       project: FormValidation.Required,
       activity: FormValidation.Required,
@@ -144,6 +147,7 @@ export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: F
         try {
           const previousDayComment = await getLastRecordingComment(toast);
           setValue("comment", previousDayComment);
+          await toast?.hide();
         } catch (error) {
           environment.isDevelopment && console.error(error);
           toast.title = "Failed to pre-fill comment";
@@ -186,11 +190,11 @@ export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: F
       }
     >
       <Form.DatePicker {...itemProps.date} title="Date" />
-      <Form.TextField {...itemProps.duration} title="Duration" storeValue />
-      <Form.TextField {...itemProps.client} title="Client" storeValue />
-      <Form.TextField {...itemProps.project} title="Project" storeValue />
-      <Form.TextField {...itemProps.activity} title="Activity" storeValue />
-      <Form.TextField {...itemProps.location} title="Location" storeValue />
+      <Form.TextField {...itemProps.duration} title="Duration" />
+      <Form.TextField {...itemProps.client} title="Client" />
+      <Form.TextField {...itemProps.project} title="Project" />
+      <Form.TextField {...itemProps.activity} title="Activity" />
+      <Form.TextField {...itemProps.location} title="Location" />
       <Form.TextArea {...itemProps.comment} title="Comment" />
     </Form>
   );
