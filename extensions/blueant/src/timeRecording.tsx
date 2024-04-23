@@ -9,13 +9,15 @@ import {
   showToast,
 } from "@raycast/api";
 import { FormValidation, useForm } from "@raycast/utils";
-import { ElementHandle, Frame, Page } from "puppeteer";
-import { Cache } from "./helpers/cache";
-import { delay } from "./helpers/puppeteer";
-import { login } from "./commands/login";
-import { openBrowserAtPage } from "./commands/openBrowserAtPage";
-import { clearInput } from "./commands/clearInput";
+import { Frame, Page } from "puppeteer";
+import { Cache, getCachedPreviousComment } from "./helpers/cache";
+import { login } from "./helpers/commands/login";
+import { openBrowserAtPage } from "./helpers/commands/openBrowserAtPage";
+import { clearInput } from "./helpers/commands/clearInput";
 import { leadingZero } from "./helpers/dates";
+import { getLastRecordingComment } from "~/helpers/commands/timeRecording/getLastRecordingComment";
+import { Pages } from "~/constants/pages";
+import { waitForTimeRecordingContent } from "~/helpers/commands/timeRecording/waitForTimeRecordingContent";
 
 const locationOptions = [
   "on site",
@@ -56,34 +58,8 @@ const initialValues: FormValues = {
   comment: "",
 };
 
-const isToday = (date: Date) => {
-  const today = new Date();
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
-};
-
 const getRecordingDate = (date: Date) => {
   return [leadingZero(date.getDate()), leadingZero(date.getMonth() + 1), date.getFullYear()].join(".");
-};
-
-const getDateString = (date: Date) => {
-  return [date.getFullYear(), leadingZero(date.getMonth() + 1), leadingZero(date.getDate())].join("-");
-};
-
-const cachePreviousComment = (message: string) => {
-  Cache.set("previousComment", getDateString(new Date()) + message);
-};
-
-const getCachedPreviousComment = () => {
-  const cachedValue = Cache.get("previousComment");
-  if (!cachedValue) return null;
-
-  const date = new Date(cachedValue.substring(0, 10));
-  if (!isToday(date)) return null;
-  return cachedValue.substring(10);
 };
 
 const getInitialValues = (): FormValues => {
@@ -114,12 +90,6 @@ const selectOptionByLabel = async (page: Page, content: Frame, label: string, va
   return page.keyboard.press("Enter", { delay: 200 }); // make sure the select is closed
 };
 
-const waitForTimeRecordingContent = async (page: Page) => {
-  const iframe = await page.waitForSelector("#rootcontent > iframe");
-  const content = await iframe?.contentFrame();
-  if (!content) throw new Error("Frame not found");
-  return content;
-};
 
 const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
   const { browser, page } = await openBrowserAtPage(Pages.TimeRecording, toast);
@@ -172,65 +142,6 @@ const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
   }
 };
 
-const setDate = async (page: Page, content: Frame) => {
-  const dateInput = await content.waitForSelector('[name="datum"]', { timeout: 10000 });
-  if (!dateInput) throw new Error("Could not find date input field");
-
-  await clearInput(page, dateInput, 10);
-  const previousDay = new Date();
-  previousDay.setDate(previousDay.getDate() - 1);
-  await dateInput.type(getRecordingDate(previousDay), { delay: 10 });
-
-  await page.keyboard.press("Tab", { delay: 1000 }); // exit the date input
-};
-
-const getPreviousDayComment = async (toast?: Toast) => {
-  const { browser, page } = await openBrowserAtPage(Pages.TimeRecording, toast);
-  try {
-    await login(page, toast);
-    const content = await waitForTimeRecordingContent(page);
-
-    const dateInput = await content.waitForSelector('[name="datum"]', { timeout: 10000 });
-    if (!dateInput) throw new Error("Could not find date input field");
-
-    !!toast && (toast.message = "Getting yesterday's message");
-
-    await content.evaluate(() => {
-      const elements = Array.from(document.querySelectorAll(".cm_worktime_recorded > .cm_link"));
-      return (elements[elements.length - 1] as HTMLAnchorElement).click();
-    });
-
-    const duplicatePreviousDayButton = await content.waitForSelector(
-      '.caption_worktime .table .tbody > .tr:last-child a[title="Copy work-time"]',
-      { timeout: 10000 },
-    );
-    await delay(500); // for some reason the button appears but isn't clickable yet
-    if (!duplicatePreviousDayButton) throw new Error("Could not find duplicate previous day button");
-
-    await duplicatePreviousDayButton.click({ delay: 100 }); // select the previous day
-    await delay(2000);
-
-    const previousMessage = await content.evaluate(() => {
-      const copyText = document.querySelector('[name="bemerkung1000"]') as HTMLInputElement;
-      return copyText.value;
-    });
-
-    if (cachePreviousComment) cachePreviousComment(previousMessage);
-
-    return previousMessage;
-  } catch (error) {
-    environment.isDevelopment && console.error(error);
-    const screenshotPath = `${environment.supportPath}/time-recording-get-previous-day-comment-error.png`;
-    const screenshot = await page?.screenshot({ path: screenshotPath });
-    if (screenshot) open(screenshotPath);
-
-    throw new Error("Failed to get previous day's comment");
-  } finally {
-    !!toast && (toast.message = "Finishing...");
-    await browser?.close();
-  }
-};
-
 export default function TimeRecordingCommand() {
   const { itemProps, handleSubmit, setValue } = useForm<FormValues>({
     onSubmit: async (values) => {
@@ -258,7 +169,7 @@ export default function TimeRecordingCommand() {
       } else {
         const toast = await showToast({ style: Toast.Style.Animated, title: "Pre-filling comment..." });
         try {
-          const previousDayComment = await getPreviousDayComment(toast);
+          const previousDayComment = await getLastRecordingComment(toast);
           setValue("comment", previousDayComment);
           await toast.hide();
         } catch (error) {

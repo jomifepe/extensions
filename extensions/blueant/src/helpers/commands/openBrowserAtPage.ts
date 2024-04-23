@@ -1,5 +1,6 @@
 import { Toast } from "@raycast/api";
 import puppeteer from "puppeteer";
+import { PageUrl } from "~/constants/pages";
 
 export const openBrowserAtPage = async (url: PageUrl, toast?: Toast) => {
   !!toast && (toast.message = "Opening page");
