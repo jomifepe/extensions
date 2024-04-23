@@ -1,13 +1,4 @@
-import {
-  Action,
-  ActionPanel,
-  Form,
-  Icon,
-  Toast,
-  environment,
-  open,
-  showToast,
-} from "@raycast/api";
+import { Action, ActionPanel, Form, Icon, LaunchProps, Toast, environment, showToast } from "@raycast/api";
 import { FormValidation, useForm } from "@raycast/utils";
 import { Frame, Page } from "puppeteer";
 import { Cache, getCachedPreviousComment } from "./helpers/cache";
@@ -18,20 +9,7 @@ import { leadingZero } from "./helpers/dates";
 import { getLastRecordingComment } from "~/helpers/commands/timeRecording/getLastRecordingComment";
 import { Pages } from "~/constants/pages";
 import { waitForTimeRecordingContent } from "~/helpers/commands/timeRecording/waitForTimeRecordingContent";
-
-const locationOptions = [
-  "on site",
-  "Office Cologne",
-  "Office Stuttgart",
-  "Office Munich",
-  "Office Berlin",
-  "Office Lisbon",
-  "Office Leiria",
-  "Office Zurich",
-  "Home Office",
-  "Office Viseu",
-  "Office Frankfurt",
-] as const;
+import { handleCommandError } from "~/helpers/errors";
 
 type FormValues = {
   date: Date | null;
@@ -62,11 +40,11 @@ const getRecordingDate = (date: Date) => {
   return [leadingZero(date.getDate()), leadingZero(date.getMonth() + 1), date.getFullYear()].join(".");
 };
 
-const getInitialValues = (): FormValues => {
+const getInitialValues = (draftValues: FormValues | undefined): FormValues => {
   const cachedValuesString = Cache.get("timeRecordingFormValues");
   try {
     const cachedValues = cachedValuesString ? JSON.parse(cachedValuesString) : {};
-    return { ...initialValues, ...cachedValues };
+    return { ...initialValues, ...cachedValues, ...draftValues };
   } catch {
     return initialValues;
   }
@@ -89,7 +67,6 @@ const selectOptionByLabel = async (page: Page, content: Frame, label: string, va
   await content.click(`[data-id="${widgetId}"]>ul>li:not(.filtered)`);
   return page.keyboard.press("Enter", { delay: 200 }); // make sure the select is closed
 };
-
 
 const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
   const { browser, page } = await openBrowserAtPage(Pages.TimeRecording, toast);
@@ -130,25 +107,22 @@ const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
       toast.title = "Failed to record time";
       toast.message = "Taking screenshot";
     }
-    environment.isDevelopment && console.error(error);
-    const screenshotPath = `${environment.supportPath}/time-recording-error.png`;
-    const screenshot = await page?.screenshot({ path: screenshotPath });
-    if (screenshot) open(screenshotPath);
-
+    await handleCommandError(error, page, "time-recording-error");
     throw new Error("Failed to record time");
   } finally {
     !!toast && (toast.message = "Finishing");
     await browser?.close();
+    toast?.hide();
   }
 };
 
-export default function TimeRecordingCommand() {
+export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: FormValues }>) {
   const { itemProps, handleSubmit, setValue } = useForm<FormValues>({
     onSubmit: async (values) => {
       cacheValues(values);
       return onSubmit(values as SubmittedFormValues);
     },
-    initialValues: getInitialValues(),
+    initialValues: getInitialValues(props.draftValues),
     validation: {
       date: FormValidation.Required,
       duration: FormValidation.Required,
@@ -160,9 +134,8 @@ export default function TimeRecordingCommand() {
     },
   });
 
-  const getPrefillCommentHandler =
-    (shouldForce = false) =>
-    async () => {
+  const getPrefillCommentHandler = (shouldForce = false) => {
+    return async () => {
       const cachedPreviousComment = getCachedPreviousComment();
       if (cachedPreviousComment && !shouldForce) {
         setValue("comment", cachedPreviousComment);
@@ -171,7 +144,6 @@ export default function TimeRecordingCommand() {
         try {
           const previousDayComment = await getLastRecordingComment(toast);
           setValue("comment", previousDayComment);
-          await toast.hide();
         } catch (error) {
           environment.isDevelopment && console.error(error);
           toast.title = "Failed to pre-fill comment";
@@ -179,6 +151,7 @@ export default function TimeRecordingCommand() {
         }
       }
     };
+  };
 
   async function onSubmit(values: SubmittedFormValues) {
     const toast = await showToast({ style: Toast.Style.Animated, title: "Recording time...", message: "Please wait" });
@@ -199,6 +172,7 @@ export default function TimeRecordingCommand() {
 
   return (
     <Form
+      enableDrafts
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Save Time Recording" onSubmit={handleSubmit} icon={Icon.SaveDocument} />
@@ -216,11 +190,7 @@ export default function TimeRecordingCommand() {
       <Form.TextField {...itemProps.client} title="Client" storeValue />
       <Form.TextField {...itemProps.project} title="Project" storeValue />
       <Form.TextField {...itemProps.activity} title="Activity" storeValue />
-      <Form.Dropdown {...itemProps.location} title="Location" storeValue>
-        {locationOptions.map((option) => (
-          <Form.Dropdown.Item key={option} value={option} title={option} />
-        ))}
-      </Form.Dropdown>
+      <Form.TextField {...itemProps.location} title="Location" storeValue />
       <Form.TextArea {...itemProps.comment} title="Comment" />
     </Form>
   );

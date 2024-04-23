@@ -1,15 +1,11 @@
-import {
-  Toast,
-  environment,
-  open,
-} from "@raycast/api";
+import { Toast } from "@raycast/api";
 import { login } from "~/helpers/commands/login";
 import { openBrowserAtPage } from "~/helpers/commands/openBrowserAtPage";
 import { Pages } from "~/constants/pages";
 import { delay } from "~/helpers/puppeteer";
 import { cachePreviousComment } from "~/helpers/cache";
 import { waitForTimeRecordingContent } from "~/helpers/commands/timeRecording/waitForTimeRecordingContent";
-
+import { handleCommandError } from "~/helpers/errors";
 
 export const getLastRecordingComment = async (toast?: Toast) => {
   const { browser, page } = await openBrowserAtPage(Pages.TimeRecording, toast);
@@ -45,11 +41,7 @@ export const getLastRecordingComment = async (toast?: Toast) => {
 
     return previousMessage;
   } catch (error) {
-    environment.isDevelopment && console.error(error);
-    const screenshotPath = `${environment.supportPath}/time-recording-get-previous-day-comment-error.png`;
-    const screenshot = await page?.screenshot({ path: screenshotPath });
-    if (screenshot) open(screenshotPath);
-
+    await handleCommandError(error, page, "time-recording-get-previous-day-comment-error");
     throw new Error("Failed to get previous day's comment");
   } finally {
     !!toast && (toast.message = "Finishing...");
