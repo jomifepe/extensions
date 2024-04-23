@@ -32,14 +32,14 @@ export const getLastRecordingComment = async (toast?: Toast) => {
     await duplicatePreviousDayButton.click({ delay: 100 }); // select the previous day
     await delay(2000);
 
-    const previousMessage = await content.evaluate(() => {
+    const comment = await content.evaluate(() => {
       const copyText = document.querySelector('[name="bemerkung1000"]') as HTMLInputElement;
       return copyText.value;
     });
 
-    if (cachePreviousComment) cachePreviousComment(previousMessage);
+    if (cachePreviousComment) cachePreviousComment(comment);
 
-    return previousMessage;
+    return comment;
   } catch (error) {
     await handleCommandError(error, page, "time-recording-get-previous-day-comment-error");
     throw new Error("Failed to get previous day's comment");

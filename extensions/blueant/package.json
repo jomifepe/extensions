@@ -21,6 +21,12 @@
       "title": "What Did I Do on My Last Day?",
       "description": "Get the comment from the last recorded day",
       "mode": "view"
+    },
+    {
+      "name": "completeWeek",
+      "title": "Report calendar week complete",
+      "description": "Report calendar week complete",
+      "mode": "no-view"
     }
   ],
   "preferences": [

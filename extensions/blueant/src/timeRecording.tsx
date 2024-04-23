@@ -10,6 +10,7 @@ import { getLastRecordingComment } from "~/helpers/commands/timeRecording/getLas
 import { Pages } from "~/constants/pages";
 import { waitForTimeRecordingContent } from "~/helpers/commands/timeRecording/waitForTimeRecordingContent";
 import { handleCommandError } from "~/helpers/errors";
+import { takeScreenshot } from "~/helpers/puppeteer";
 
 type FormValues = {
   date: Date | null;
@@ -101,18 +102,24 @@ const recordTime = async (values: SubmittedFormValues, toast?: Toast) => {
 
     !!toast && (toast.message = "Saving");
     await content.click('[name="speichern"]', { delay: 10 });
+
+    return { screenshotPath: await takeScreenshot(page, "time-recording-success") };
   } catch (error) {
+    const { screenshotPath } = await handleCommandError(error, page, "time-recording-error");
     if (toast) {
       toast.style = Toast.Style.Failure;
       toast.title = "Failed to record time";
-      toast.message = "Taking screenshot";
+      if (screenshotPath) {
+        toast.primaryAction = {
+          title: "Open screenshot",
+          onAction: () => open(screenshotPath),
+        };
+      }
     }
-    await handleCommandError(error, page, "time-recording-error");
     throw new Error("Failed to record time");
   } finally {
     !!toast && (toast.message = "Finishing");
     await browser?.close();
-    toast?.hide();
   }
 };
 
@@ -145,8 +152,8 @@ export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: F
       } else {
         const toast = await showToast({ style: Toast.Style.Animated, title: "Pre-filling comment..." });
         try {
-          const previousDayComment = await getLastRecordingComment(toast);
-          setValue("comment", previousDayComment);
+          const comment = await getLastRecordingComment(toast);
+          setValue("comment", comment);
           await toast?.hide();
         } catch (error) {
           environment.isDevelopment && console.error(error);
@@ -162,10 +169,16 @@ export default function TimeRecordingCommand(props: LaunchProps<{ draftValues: F
     try {
       if (!values.date) throw new Error("Date is required");
 
-      await recordTime(values, toast);
+      const { screenshotPath } = await recordTime(values, toast);
       toast.title = "Time recorded";
       toast.style = Toast.Style.Success;
       toast.message = "Time recording submitted successfully";
+      if (screenshotPath) {
+        toast.primaryAction = {
+          title: "Open screenshot",
+          onAction: () => open(screenshotPath),
+        };
+      }
     } catch (error) {
       environment.isDevelopment && console.error(error);
       toast.title = "Failed to record time";

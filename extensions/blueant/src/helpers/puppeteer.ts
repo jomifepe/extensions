@@ -7,8 +7,14 @@ export const delay = (time: number) => {
   });
 }
 
-export const takeAndOpenScreenshot = async (page: Page, name: string) => {
+export const takeScreenshot = async (page: Page, name: string) => {
   const screenshotPath = `${environment.supportPath}/${name}.png`;
-  const screenshot = await page?.screenshot({ path: screenshotPath });
-  if (screenshot) open(screenshotPath);
+  await page.screenshot({ path: screenshotPath });
+  return screenshotPath;
+}
+
+export const takeAndOpenScreenshot = async (page: Page, name: string) => {
+  const screenshotPath = await takeScreenshot(page, name);
+  if (screenshotPath) await open(screenshotPath);
+  return screenshotPath;
 }
