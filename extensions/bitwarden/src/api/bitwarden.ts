@@ -4,14 +4,14 @@ import { accessSync, chmodSync, constants, existsSync, unlinkSync, writeFileSync
 import { chmod, rename, rm } from "fs/promises";
 import { join } from "path";
 import { dirname } from "path/posix";
-import { prepareSendPayload } from "~/api/bitwarden.helpers";
+import { prepareCommandError, prepareSendPayload } from "~/api/bitwarden.helpers";
 import { DEFAULT_SERVER_URL, LOCAL_STORAGE_KEY } from "~/constants/general";
 import { VaultState, VaultStatus } from "~/types/general";
 import { PasswordGeneratorOptions } from "~/types/passwords";
 import { ReceivedSend, Send, SendCreatePayload, SendType } from "~/types/send";
 import { Folder, Item } from "~/types/vault";
 import { getFileSha256 } from "~/utils/crypto";
-import { captureException, CaptureExceptionOptions } from "~/utils/development";
+import { captureException } from "~/utils/development";
 import {
   EnsureCliBinError,
   InstalledCLINotFoundError,
@@ -137,13 +137,6 @@ export const cliInfo = {
     return getFileSha256(filePath) === this.sha256;
   },
 } as const;
-
-class SafeExecaError extends Error {
-  constructor(message: string, public readonly stack?: string) {
-    super(message);
-    super.stack = stack;
-  }
-}
 
 export class Bitwarden {
   private env: Env;
@@ -322,35 +315,16 @@ export class Bitwarden {
     return result;
   }
 
-  captureCommandError(commandName: string, error: any, options?: CaptureExceptionOptions) {
-    // console.log(Object.entries(error));
-    const execaError = error as ExecaError;
-    if (execaError.stderr) {
-      const safeError = new SafeExecaError(
-        execaError.shortMessage.replace(execaError.command, commandName),
-        execaError.stack ? execaError.stack.replace(new RegExp(execaError.command, "g"), commandName) : undefined
-      );
-      captureException(`Failed to execute ${commandName}`, safeError, options);
-      return safeError;
-    } else {
-      captureException(`Failed to execute ${commandName}`, error, options);
-      return error;
-    }
-  }
-
   async login(): Promise<MaybeError> {
     try {
       await this.exec(["login", "--apikey"], { resetVaultTimeout: true });
       await this.saveLastVaultStatus("login", "unlocked");
       await this.callActionListeners("login");
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Login", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Login", error);
     }
   }
 
@@ -363,13 +337,10 @@ export class Bitwarden {
       await this.saveLastVaultStatus("logout", "unauthenticated");
       if (!immediate) await this.handlePostLogout(reason);
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Logout", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Logout", error);
     }
   }
 
@@ -387,30 +358,26 @@ export class Bitwarden {
       await this.saveLastVaultStatus("lock", "locked");
       if (!immediate) await this.callActionListeners("lock", reason);
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Lock", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Lock", error);
     }
   }
 
   async unlock(password: string): Promise<MaybeError<string>> {
     try {
-      const { stdout: sessionToken } = await this.exec(["unlock", password, "--raw"], { resetVaultTimeout: true });
+      const { stdout: sessionToken } = await this.exec(["unlock", password, "--rawx"], { resetVaultTimeout: true });
       this.setSessionToken(sessionToken);
       await this.saveLastVaultStatus("unlock", "unlocked");
       await this.callActionListeners("unlock", password, sessionToken);
       return { result: sessionToken };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Unlock", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const execaError = error as ExecaError;
+      console.log(execaError.message);
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Unlock", error);
     }
   }
 
@@ -418,13 +385,10 @@ export class Bitwarden {
     try {
       await this.exec(["sync"], { resetVaultTimeout: true });
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Sync", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Sync", error);
     }
   }
 
@@ -432,13 +396,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["get", "item", id], { resetVaultTimeout: true });
       return { result: JSON.parse<Item>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Failed to get item", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Failed to get item", error);
     }
   }
 
@@ -448,13 +409,10 @@ export class Bitwarden {
       const items = JSON.parse<Item[]>(stdout);
       // Filter out items without a name property (they are not displayed in the bitwarden app)
       return { result: items.filter((item: Item) => !!item.name) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("List Items", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("List Items", error);
     }
   }
 
@@ -462,13 +420,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["list", "folders"], { resetVaultTimeout: true });
       return { result: JSON.parse<Folder[]>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("List Folders", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("List Folders", error);
     }
   }
 
@@ -483,13 +438,10 @@ export class Bitwarden {
 
       await this.exec(["create", "folder", encodedFolder], { resetVaultTimeout: true });
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Create Folder", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Create Folder", error);
     }
   }
 
@@ -498,13 +450,10 @@ export class Bitwarden {
       // this could return something like "Not found." but checks for totp code are done before calling this function
       const { stdout } = await this.exec(["get", "totp", id], { resetVaultTimeout: true });
       return { result: stdout };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Get TOTP", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Get TOTP", error);
     }
   }
 
@@ -512,13 +461,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["status"], { resetVaultTimeout: false });
       return { result: JSON.parse<VaultState>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Status", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Status", error);
     }
   }
 
@@ -542,13 +488,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["get", "template", type], { resetVaultTimeout: true });
       return { result: JSON.parse<T>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Get Template", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Get Template", error);
     }
   }
 
@@ -556,13 +499,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["encode"], { input, resetVaultTimeout: false });
       return { result: stdout };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Encode", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Encode", error);
     }
   }
 
@@ -576,13 +516,10 @@ export class Bitwarden {
     try {
       const { stdout } = await this.exec(["send", "list"], { resetVaultTimeout: true });
       return { result: JSON.parse<Send[]>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send List", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send List", error);
     }
   }
 
@@ -600,13 +537,10 @@ export class Bitwarden {
       const { stdout } = await this.exec(["send", "create", encodedPayload], { resetVaultTimeout: true });
 
       return { result: JSON.parse<Send>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send Create", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send Create", error);
     }
   }
 
@@ -617,13 +551,10 @@ export class Bitwarden {
 
       const { stdout } = await this.exec(["send", "edit", encodedPayload], { resetVaultTimeout: true });
       return { result: JSON.parse<Send>(stdout) };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Failed to delete send", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Failed to delete send", error);
     }
   }
 
@@ -631,13 +562,10 @@ export class Bitwarden {
     try {
       await this.exec(["send", "delete", id], { resetVaultTimeout: true });
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send Delete", execError);
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send Delete", error);
     }
   }
 
@@ -645,15 +573,10 @@ export class Bitwarden {
     try {
       await this.exec(["send", "remove-password", id], { resetVaultTimeout: true });
       return { result: undefined };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send Remove Password", execError, {
-          reportToRaycast: false,
-        });
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send Remove Password", error);
     }
   }
 
@@ -667,17 +590,14 @@ export class Bitwarden {
       if (!stdout && /Send password/i.test(stderr)) return { error: new SendNeedsPasswordError() };
 
       return { result: JSON.parse<ReceivedSend>(stdout) };
-    } catch (execError) {
-      const errorMessage = (execError as ExecaError).stderr;
+    } catch (error) {
+      const errorMessage = (error as ExecaError).stderr;
       if (/Invalid password/gi.test(errorMessage)) return { error: new SendInvalidPasswordError() };
       if (/Send password/gi.test(errorMessage)) return { error: new SendNeedsPasswordError() };
 
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send Receive Info/Obj", execError, { reportToRaycast: false });
-        throw safeError;
-      }
-      return { error };
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send Receive Info/Obj", error);
     }
   }
 
@@ -688,13 +608,10 @@ export class Bitwarden {
       if (savePath) args.push("--output", savePath);
       const { stdout } = await this.exec(args, { resetVaultTimeout: true, input: password });
       return { result: stdout };
-    } catch (execError) {
-      const { error } = await this.handleCommonErrors(execError);
-      if (!error) {
-        const safeError = this.captureCommandError("Send Receive", execError, { reportToRaycast: false });
-        throw safeError;
-      }
-      return { error };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Send Receive", error);
     }
   }
 
@@ -722,16 +639,16 @@ export class Bitwarden {
     await this.callActionListeners("logout", reason);
   }
 
-  private async handleCommonErrors(error: any): Promise<{ error?: ManuallyThrownError }> {
+  private async handleCommonErrors(error: any): Promise<{ handledError?: ManuallyThrownError }> {
     const errorMessage = (error as ExecaError).stderr;
     if (!errorMessage) return {};
 
     if (/not logged in/i.test(errorMessage)) {
       await this.handlePostLogout();
-      return { error: new NotLoggedInError("Not logged in") };
+      return { handledError: new NotLoggedInError("Not logged in") };
     }
     if (/Premium status/i.test(errorMessage)) {
-      return { error: new PremiumFeatureError() };
+      return { handledError: new PremiumFeatureError() };
     }
     return {};
   }
@@ -764,7 +681,7 @@ export class Bitwarden {
         try {
           await (listener as any)?.(...args);
         } catch (error) {
-          this.captureCommandError(`Error calling bitwarden action listener for ${action}`, error);
+          captureException(`Error calling bitwarden action listener for ${action}`, error);
         }
       }
     }

@@ -11,6 +11,14 @@ export class DisplayableError extends ManuallyThrownError {
   }
 }
 
+export class BitwardenCommandError extends Error {
+  constructor(message: string, stack?: string) {
+    super(message);
+    this.name = "BitwardenCommandError";
+    this.stack = stack;
+  }
+}
+
 /* -- specific errors below -- */
 
 export class CLINotFoundError extends DisplayableError {
