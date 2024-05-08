@@ -1,4 +1,4 @@
-import { environment } from "@raycast/api";
+import { environment, captureException as raycastCaptureException } from "@raycast/api";
 import { getErrorString } from "~/utils/errors";
 
 type Log = {
@@ -26,11 +26,23 @@ const _exceptions = {
 
 export const capturedExceptions = Object.freeze(_exceptions);
 
-export const captureException = (description: string | Falsy | (string | Falsy)[], error: any) => {
+export type CaptureExceptionOptions = {
+  reportToRaycast?: boolean;
+};
+
+export const captureException = (
+  description: string | Falsy | (string | Falsy)[],
+  error: any,
+  options?: CaptureExceptionOptions
+) => {
+  const { reportToRaycast = true } = options ?? {};
   const desc = Array.isArray(description) ? description.filter(Boolean).join(" ") : description || "Captured exception";
   capturedExceptions.set(desc, error);
-  if (!environment.isDevelopment) return;
-  console.error(desc, error);
+  if (environment.isDevelopment) {
+    console.error(desc, error);
+  } else if (reportToRaycast) {
+    raycastCaptureException(error);
+  }
 };
 
 export const debugLog = (...args: any[]) => {

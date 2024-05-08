@@ -2,7 +2,7 @@ import { createContext, PropsWithChildren, useContext, useEffect, useState } fro
 import { Bitwarden } from "~/api/bitwarden";
 import { LoadingFallback } from "~/components/LoadingFallback";
 import TroubleshootingGuide from "~/components/TroubleshootingGuide";
-import { InstalledCLINotFoundError } from "~/utils/errors";
+import { captureException } from "~/utils/development";
 
 const BitwardenContext = createContext<Bitwarden | null>(null);
 
@@ -19,11 +19,8 @@ export const BitwardenProvider = ({ children, loadingFallback = <LoadingFallback
   }, []);
 
   function handleBwInitError(error: Error) {
-    if (error instanceof InstalledCLINotFoundError) {
-      setError(error);
-    } else {
-      throw error;
-    }
+    captureException("Failed to initialize bitwarden", error);
+    setError(error);
   }
 
   if (error) return <TroubleshootingGuide error={error} />;
