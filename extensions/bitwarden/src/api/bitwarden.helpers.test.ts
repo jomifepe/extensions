@@ -1,4 +1,5 @@
-import { prepareCommandError } from "~/api/bitwarden.helpers";
+import { prepareCommandError } from "./bitwarden.helpers";
+import { BwCommands } from "./bitwarden.types";
 
 class MockExecaError extends Error {
   shortMessage: string;
@@ -23,48 +24,64 @@ class MockExecaError extends Error {
   }
 }
 
+type CommandDefinition = string | ((value: any) => string);
+
 const mockCliPath = "/opt/homebrew/bin/bw";
-const mockCommands = {
-  login: `${mockCliPath} login --apikey --foobar`,
-  logout: `${mockCliPath} logout --foobar`,
-  lock: `${mockCliPath} lock --foobar`,
-  unlock: (password: string) => `${mockCliPath} unlock ${password} --raw --foobar`,
-  sync: `${mockCliPath} sync --foobar`,
-  listItems: `${mockCliPath} list items --foobar`,
-  listFolders: `${mockCliPath} list folders --foobar`,
-  createFolder: (payload: string) => `${mockCliPath} create folder ${payload} --foobar`,
-  getTotp: (id: string) => `${mockCliPath} get totp ${id} --foobar`,
-  status: `${mockCliPath} status --foobar`,
-  getTemplate: `${mockCliPath} get template folder --foobar`,
-  encode: `${mockCliPath} encode --foobar`,
-  generatePassword: `${mockCliPath} generate --length 20 --foobar`,
-  listSends: `${mockCliPath} send list --foobar`,
-  createSend: (payload: string) => `${mockCliPath} send create ${payload} --foobar`,
-  editSend: (payload: string) => `${mockCliPath} send edit ${payload} --foobar`,
-  deleteSend: (id: string) => `${mockCliPath} send delete ${id} --foobar`,
-  removeSendPassword: (id: string) => `${mockCliPath} send remove-password ${id} --foobar`,
-  receiveSendInfo: (url: string) => `${mockCliPath} send receive ${url} --foobar`,
-  receiveSend: (url: string) => `${mockCliPath} send receive ${url} --foobar`,
+const mockCommands: Record<keyof BwCommands, CommandDefinition> = {
+  login: `${mockCliPath} login --apikey`,
+  logout: `${mockCliPath} logout`,
+  lock: `${mockCliPath} lock`,
+  unlock: (password: string) => `${mockCliPath} unlock ${password} --raw`,
+  sync: `${mockCliPath} sync`,
+  getItem: (id: string) => `${mockCliPath} get items ${id}`,
+  listItems: `${mockCliPath} list items`,
+  listFolders: `${mockCliPath} list folders`,
+  createFolder: (payload: string) => `${mockCliPath} create folder ${payload}`,
+  getTotp: (id: string) => `${mockCliPath} get totp ${id}`,
+  status: `${mockCliPath} status`,
+  checkLockStatus: `${mockCliPath} unlock --check`,
+  getTemplate: `${mockCliPath} get template folder`,
+  encode: `${mockCliPath} encode`,
+  generatePassword: `${mockCliPath} generate --length 20`,
+  listSends: `${mockCliPath} send list`,
+  createSend: (payload: string) => `${mockCliPath} send create ${payload}`,
+  editSend: (payload: string) => `${mockCliPath} send edit ${payload}`,
+  deleteSend: (id: string) => `${mockCliPath} send delete ${id}`,
+  removeSendPassword: (id: string) => `${mockCliPath} send remove-password ${id}`,
+  receiveSendInfo: (url: string) => `${mockCliPath} send receive ${url}`,
+  receiveSend: (url: string) => `${mockCliPath} send receive ${url}`,
+};
+const mockStderr = `error: unknown option '--foobar'\n(Did you mean --foobaz?)`;
+
+type GetCommandStringReturn = {
+  commandString: string;
+  redactedCommandString?: string;
+  sensitiveValues?: [string];
 };
 
-const getCommandString = (command: string | ((value: any) => string), badSensitiveValue?: string) => {
+function getCommandString(command: CommandDefinition): GetCommandStringReturn;
+function getCommandString(
+  command: CommandDefinition,
+  forgottenSensitiveValue: string
+): Require<GetCommandStringReturn, "sensitiveValues">;
+function getCommandString(command: CommandDefinition, forgottenSensitiveValue?: string): GetCommandStringReturn {
   if (typeof command === "function") {
-    const sensitiveValues = ["POSSIBLE_SENSITIVE_VALUE"] as [string];
+    const sensitiveValues: [string] = ["POSSIBLE_SENSITIVE_VALUE"];
     return {
-      commandString: badSensitiveValue ? command(badSensitiveValue) : command(...sensitiveValues),
+      commandString: forgottenSensitiveValue ? command(forgottenSensitiveValue) : command(...sensitiveValues),
       redactedCommandString: command("[REDACTED]"),
       sensitiveValues,
     };
   }
   return { commandString: command };
-};
+}
 
 describe("bitwarden.helpers", () => {
   describe("prepareCommandError", () => {
     Object.entries(mockCommands).forEach(([commandName, command]) => {
       it(`error thrown by ${commandName} bitwarden command should be free of sensitive values if defined`, () => {
         const { sensitiveValues, commandString, redactedCommandString } = getCommandString(command);
-        const error = new MockExecaError(commandString, `error: unknown option '--foobar'\n(Did you mean --foobaz?)`);
+        const error = new MockExecaError(commandString, mockStderr);
         const result = prepareCommandError(commandName, error, sensitiveValues);
 
         if (sensitiveValues) {
@@ -94,20 +111,23 @@ describe("bitwarden.helpers", () => {
     Object.entries(mockCommands).forEach(([commandName, command]) => {
       if (typeof command !== "function") return;
 
-      it(`should omit whole ${commandName} command if sensitiveValues were defined but the error remained unchanged`, () => {
-        const badSensitiveValue = "MYPASSWORD";
-        const { sensitiveValues, commandString, redactedCommandString } = getCommandString(command, badSensitiveValue);
+      it(`should omit whole ${commandName} command if sensitive values were defined but the error remained unchanged`, () => {
+        const forgottenSensitiveValue = "MYPASSWORD";
+        const { sensitiveValues, commandString, redactedCommandString } = getCommandString(
+          command,
+          forgottenSensitiveValue
+        );
 
-        const error = new MockExecaError(commandString, `error: unknown option '--foobar'\n(Did you mean --foobaz?)`);
+        const error = new MockExecaError(commandString, mockStderr);
         const result = prepareCommandError(commandName, error, sensitiveValues);
 
-        expect(commandString).toContain(badSensitiveValue);
+        expect(commandString).toContain(forgottenSensitiveValue);
 
         expect(result.message).not.toEqual(error.message);
         expect(result.stack).not.toEqual(error.stack);
 
         // no command string, redacted or not
-        sensitiveValues!.forEach((sensitiveValue) => {
+        sensitiveValues.forEach((sensitiveValue) => {
           expect(result.stack).not.toContain(sensitiveValue);
         });
         expect(result.message).not.toContain(commandString);

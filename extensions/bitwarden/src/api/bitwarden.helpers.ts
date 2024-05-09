@@ -18,20 +18,21 @@ const redactSensitiveValues = (
   commandName: string,
   sensitiveValues?: Nullable<string> | Nullable<string>[]
 ): string => {
-  if (sensitiveValues) {
-    const cleanValue = ensureArray(sensitiveValues).reduce<string>((result, sensitiveValue) => {
-      return sensitiveValue ? result.replace(new RegExp(sensitiveValue, "gi"), "[REDACTED]") : result;
-    }, value);
-    if (cleanValue === value) {
-      const cliPath = command.replace(/^(\/[^ ]*).*/, "$1");
-      return value.replace(
-        new RegExp(command, "gi"),
-        cliPath ? `${cliPath} [${commandName.toUpperCase()}]` : commandName
-      );
-    }
-    return cleanValue;
+  if (!sensitiveValues) return value;
+
+  const cleanValue = ensureArray(sensitiveValues).reduce<string>((result, sensitiveValue) => {
+    return sensitiveValue ? result.replace(new RegExp(sensitiveValue, "gi"), "[REDACTED]") : result;
+  }, value);
+
+  if (cleanValue === value) {
+    const cliPath = command.replace(/^(\/[^ ]*).*/, "$1");
+    return value.replace(
+      new RegExp(command, "gi"),
+      cliPath ? `${cliPath} [${commandName.toUpperCase()}]` : commandName
+    );
   }
-  return value;
+
+  return cleanValue;
 };
 
 export function prepareCommandError(

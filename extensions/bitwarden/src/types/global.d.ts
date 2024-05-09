@@ -28,6 +28,7 @@ declare global {
   type MaybePromise<T> = T | Promise<T>;
   type Nullable<T> = T | null | undefined;
   type Falsy = false | "" | 0 | null | undefined;
+  type Require<T, K extends keyof T> = Omit<T, K> & Required<Pick<T, K>>;
 }
 
 export {};

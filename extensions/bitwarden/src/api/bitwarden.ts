@@ -4,7 +4,18 @@ import { accessSync, chmodSync, constants, existsSync, unlinkSync, writeFileSync
 import { chmod, rename, rm } from "fs/promises";
 import { join } from "path";
 import { dirname } from "path/posix";
-import { prepareCommandError, prepareSendPayload } from "~/api/bitwarden.helpers";
+import { prepareCommandError, prepareSendPayload } from "./bitwarden.helpers";
+import {
+  BwCommands,
+  BwActionListeners,
+  BwActionListenersMap,
+  BwEnv,
+  BwExecProps,
+  BwLockOptions,
+  BwLogoutOptions,
+  BwReceiveSendOptions,
+  MaybeError,
+} from "./bitwarden.types";
 import { DEFAULT_SERVER_URL, LOCAL_STORAGE_KEY } from "~/constants/general";
 import { VaultState, VaultStatus } from "~/types/general";
 import { PasswordGeneratorOptions } from "~/types/passwords";
@@ -27,53 +38,6 @@ import { decompressFile, removeFilesThatStartWith, unlinkAllSync, waitForFileAva
 import { download } from "~/utils/network";
 import { getPasswordGeneratingArgs } from "~/utils/passwords";
 import { getServerUrlPreference } from "~/utils/preferences";
-
-type Env = {
-  BITWARDENCLI_APPDATA_DIR: string;
-  BW_CLIENTSECRET: string;
-  BW_CLIENTID: string;
-  PATH: string;
-  NODE_EXTRA_CA_CERTS?: string;
-  BW_SESSION?: string;
-};
-
-type ActionListeners = {
-  login?: () => MaybePromise<void>;
-  logout?: (reason?: string) => MaybePromise<void>;
-  lock?: (reason?: string) => MaybePromise<void>;
-  unlock?: (password: string, sessionToken: string) => MaybePromise<void>;
-};
-
-type ActionListenersMap<T extends keyof ActionListeners = keyof ActionListeners> = Map<T, Set<ActionListeners[T]>>;
-
-type MaybeError<T = undefined> = { result: T; error?: undefined } | { result?: undefined; error: ManuallyThrownError };
-
-type ExecProps = {
-  /** Reset the time of the last command that accessed data or modified the vault, used to determine if the vault timed out */
-  resetVaultTimeout: boolean;
-  abortController?: AbortController;
-  input?: string;
-};
-
-type LockOptions = {
-  /** The reason for locking the vault */
-  reason?: string;
-  checkVaultStatus?: boolean;
-  /** The callbacks are called before the operation is finished (optimistic) */
-  immediate?: boolean;
-};
-
-type LogoutOptions = {
-  /** The reason for locking the vault */
-  reason?: string;
-  /** The callbacks are called before the operation is finished (optimistic) */
-  immediate?: boolean;
-};
-
-type ReceiveSendOptions = {
-  savePath?: string;
-  password?: string;
-};
 
 const { supportPath } = environment;
 
@@ -138,11 +102,11 @@ export const cliInfo = {
   },
 } as const;
 
-export class Bitwarden {
-  private env: Env;
+export class Bitwarden implements BwCommands {
+  private env: BwEnv;
   private initPromise: Promise<void>;
   private tempSessionToken?: string;
-  private actionListeners: ActionListenersMap = new Map();
+  private actionListeners: BwActionListenersMap = new Map();
   private preferences = getPreferenceValues<Preferences>();
   private cliPath: string;
   private toastInstance: Toast | undefined;
@@ -290,7 +254,7 @@ export class Bitwarden {
     }
   }
 
-  private async exec(args: string[], options: ExecProps): Promise<ExecaChildProcess> {
+  private async exec(args: string[], options: BwExecProps): Promise<ExecaChildProcess> {
     const { abortController, input = "", resetVaultTimeout } = options ?? {};
 
     let env = this.env;
@@ -328,7 +292,7 @@ export class Bitwarden {
     }
   }
 
-  async logout(options?: LogoutOptions): Promise<MaybeError> {
+  async logout(options?: BwLogoutOptions): Promise<MaybeError> {
     const { reason, immediate = false } = options ?? {};
     try {
       if (immediate) await this.handlePostLogout(reason);
@@ -344,7 +308,7 @@ export class Bitwarden {
     }
   }
 
-  async lock(options?: LockOptions): Promise<MaybeError> {
+  async lock(options?: BwLockOptions): Promise<MaybeError> {
     const { reason, checkVaultStatus = false, immediate = false } = options ?? {};
     try {
       if (immediate) await this.callActionListeners("lock", reason);
@@ -373,8 +337,6 @@ export class Bitwarden {
       await this.callActionListeners("unlock", password, sessionToken);
       return { result: sessionToken };
     } catch (error) {
-      const execaError = error as ExecaError;
-      console.log(execaError.message);
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
       throw prepareCommandError("Unlock", error, password);
@@ -593,7 +555,7 @@ export class Bitwarden {
     }
   }
 
-  async receiveSendInfo(url: string, options?: ReceiveSendOptions): Promise<MaybeError<ReceivedSend>> {
+  async receiveSendInfo(url: string, options?: BwReceiveSendOptions): Promise<MaybeError<ReceivedSend>> {
     const { password } = options ?? {};
     try {
       const { stdout, stderr } = await this.exec(["send", "receive", url, "--obj"], {
@@ -615,7 +577,7 @@ export class Bitwarden {
     }
   }
 
-  async receiveSend(url: string, options?: ReceiveSendOptions): Promise<MaybeError<string>> {
+  async receiveSend(url: string, options?: BwReceiveSendOptions): Promise<MaybeError<string>> {
     const { savePath, password } = options ?? {};
     try {
       const args = ["send", "receive", url];
@@ -667,7 +629,7 @@ export class Bitwarden {
     return {};
   }
 
-  setActionListener<A extends keyof ActionListeners>(action: A, listener: ActionListeners[A]): this {
+  setActionListener<A extends keyof BwActionListeners>(action: A, listener: BwActionListeners[A]): this {
     const listeners = this.actionListeners.get(action);
     if (listeners && listeners.size > 0) {
       listeners.add(listener);
@@ -677,7 +639,7 @@ export class Bitwarden {
     return this;
   }
 
-  removeActionListener<A extends keyof ActionListeners>(action: A, listener: ActionListeners[A]): this {
+  removeActionListener<A extends keyof BwActionListeners>(action: A, listener: BwActionListeners[A]): this {
     const listeners = this.actionListeners.get(action);
     if (listeners && listeners.size > 0) {
       listeners.delete(listener);
@@ -685,9 +647,9 @@ export class Bitwarden {
     return this;
   }
 
-  private async callActionListeners<A extends keyof ActionListeners>(
+  private async callActionListeners<A extends keyof BwActionListeners>(
     action: A,
-    ...args: Parameters<NonNullable<ActionListeners[A]>>
+    ...args: Parameters<NonNullable<BwActionListeners[A]>>
   ) {
     const listeners = this.actionListeners.get(action);
     if (listeners && listeners.size > 0) {
