@@ -15,7 +15,7 @@ export class BitwardenCommandError extends Error {
   constructor(message: string, stack?: string) {
     super(message);
     this.name = "BitwardenCommandError";
-    this.stack = stack;
+    this.stack = stack || undefined;
   }
 }
 

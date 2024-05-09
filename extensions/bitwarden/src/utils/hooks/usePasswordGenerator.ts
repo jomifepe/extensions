@@ -45,7 +45,11 @@ function usePasswordGenerator() {
     try {
       renewAbortController();
       dispatch({ type: "generate" });
-      const password = await bitwarden.generatePassword(passwordOptions, abortControllerRef?.current);
+      const { result: password, error } = await bitwarden.generatePassword(
+        passwordOptions,
+        abortControllerRef?.current
+      );
+      if (error) throw error;
       dispatch({ type: "setPassword", password });
     } catch (error) {
       // generate password was likely aborted

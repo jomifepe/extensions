@@ -367,7 +367,7 @@ export class Bitwarden {
 
   async unlock(password: string): Promise<MaybeError<string>> {
     try {
-      const { stdout: sessionToken } = await this.exec(["unlock", password, "--rawx"], { resetVaultTimeout: true });
+      const { stdout: sessionToken } = await this.exec(["unlock", password, "--raw"], { resetVaultTimeout: true });
       this.setSessionToken(sessionToken);
       await this.saveLastVaultStatus("unlock", "unlocked");
       await this.callActionListeners("unlock", password, sessionToken);
@@ -377,7 +377,7 @@ export class Bitwarden {
       console.log(execaError.message);
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Unlock", error);
+      throw prepareCommandError("Unlock", error, password);
     }
   }
 
@@ -399,7 +399,7 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Failed to get item", error);
+      throw prepareCommandError("Failed to get item", error, [id]);
     }
   }
 
@@ -441,7 +441,7 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Create Folder", error);
+      throw prepareCommandError("Create Folder", error, [name]);
     }
   }
 
@@ -453,7 +453,7 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Get TOTP", error);
+      throw prepareCommandError("Get TOTP", error, [id]);
     }
   }
 
@@ -502,14 +502,23 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Encode", error);
+      throw prepareCommandError("Encode", error, [input]);
     }
   }
 
-  async generatePassword(options?: PasswordGeneratorOptions, abortController?: AbortController): Promise<string> {
-    const args = options ? getPasswordGeneratingArgs(options) : [];
-    const { stdout } = await this.exec(["generate", ...args], { abortController, resetVaultTimeout: false });
-    return stdout;
+  async generatePassword(
+    options?: PasswordGeneratorOptions,
+    abortController?: AbortController
+  ): Promise<MaybeError<string>> {
+    try {
+      const args = options ? getPasswordGeneratingArgs(options) : [];
+      const { stdout } = await this.exec(["generate", ...args], { abortController, resetVaultTimeout: false });
+      return { result: stdout };
+    } catch (error) {
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Generate Password", error);
+    }
   }
 
   async listSends(): Promise<MaybeError<Send[]>> {
@@ -524,6 +533,7 @@ export class Bitwarden {
   }
 
   async createSend(values: SendCreatePayload): Promise<MaybeError<Send>> {
+    let commandPayload: string | undefined;
     try {
       const { error: templateError, result: template } = await this.getTemplate(
         values.type === SendType.Text ? "send.text" : "send.file"
@@ -533,6 +543,7 @@ export class Bitwarden {
       const payload = prepareSendPayload(template, values);
       const { result: encodedPayload, error: encodeError } = await this.encode(JSON.stringify(payload));
       if (encodeError) throw encodeError;
+      commandPayload = encodedPayload;
 
       const { stdout } = await this.exec(["send", "create", encodedPayload], { resetVaultTimeout: true });
 
@@ -540,21 +551,23 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Send Create", error);
+      throw prepareCommandError("Send Create", error, [commandPayload]);
     }
   }
 
   async editSend(values: SendCreatePayload): Promise<MaybeError<Send>> {
+    let commandPayload: string | undefined;
     try {
       const { result: encodedPayload, error: encodeError } = await this.encode(JSON.stringify(values));
       if (encodeError) throw encodeError;
+      commandPayload = encodedPayload;
 
       const { stdout } = await this.exec(["send", "edit", encodedPayload], { resetVaultTimeout: true });
       return { result: JSON.parse<Send>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Failed to delete send", error);
+      throw prepareCommandError("Failed to delete send", error, [commandPayload]);
     }
   }
 
@@ -565,7 +578,7 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Send Delete", error);
+      throw prepareCommandError("Send Delete", error, [id]);
     }
   }
 
@@ -576,15 +589,16 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Send Remove Password", error);
+      throw prepareCommandError("Send Remove Password", error, [id]);
     }
   }
 
   async receiveSendInfo(url: string, options?: ReceiveSendOptions): Promise<MaybeError<ReceivedSend>> {
+    const { password } = options ?? {};
     try {
       const { stdout, stderr } = await this.exec(["send", "receive", url, "--obj"], {
         resetVaultTimeout: true,
-        input: options?.password,
+        input: password,
       });
       if (!stdout && /Invalid password/i.test(stderr)) return { error: new SendInvalidPasswordError() };
       if (!stdout && /Send password/i.test(stderr)) return { error: new SendNeedsPasswordError() };
@@ -597,7 +611,7 @@ export class Bitwarden {
 
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Send Receive Info/Obj", error);
+      throw prepareCommandError("Send Receive Info/Obj", error, [url, password]);
     }
   }
 
@@ -611,7 +625,7 @@ export class Bitwarden {
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
       if (handledError) return { error: handledError };
-      throw prepareCommandError("Send Receive", error);
+      throw prepareCommandError("Send Receive", error, [url, password]);
     }
   }
 

@@ -1,6 +1,7 @@
 import { ExecaError } from "execa";
 import { SendCreatePayload } from "~/types/send";
 import { BitwardenCommandError } from "~/utils/errors";
+import { ensureArray } from "~/utils/objects";
 
 export function prepareSendPayload(template: SendCreatePayload, values: SendCreatePayload): SendCreatePayload {
   return {
@@ -11,23 +12,40 @@ export function prepareSendPayload(template: SendCreatePayload, values: SendCrea
   };
 }
 
-const extractCliPath = (command: string): string => {
-  return command.replace(/^(\/[^ ]*).*/, "$1");
+const redactSensitiveValues = (
+  value: string,
+  command: string,
+  commandName: string,
+  sensitiveValues?: Nullable<string> | Nullable<string>[]
+): string => {
+  if (sensitiveValues) {
+    const cleanValue = ensureArray(sensitiveValues).reduce<string>((result, sensitiveValue) => {
+      return sensitiveValue ? result.replace(new RegExp(sensitiveValue, "gi"), "[REDACTED]") : result;
+    }, value);
+    if (cleanValue === value) {
+      const cliPath = command.replace(/^(\/[^ ]*).*/, "$1");
+      return value.replace(
+        new RegExp(command, "gi"),
+        cliPath ? `${cliPath} [${commandName.toUpperCase()}]` : commandName
+      );
+    }
+    return cleanValue;
+  }
+  return value;
 };
 
-const replaceCliCommand = (message: string, command: string, commandName: string): string => {
-  const redactedValue = `${extractCliPath(command)} ${commandName}`;
-  return message ? message.replace(new RegExp(command, "gi"), redactedValue) : redactedValue;
-};
-
-export function prepareCommandError(commandName: string, error: any) {
+export function prepareCommandError(
+  commandName: string,
+  error: any,
+  sensitiveValues?: Nullable<string> | Nullable<string>[]
+) {
   const execaError = error as ExecaError;
   if (execaError.stderr) {
-    const safeError = new BitwardenCommandError(
-      replaceCliCommand(execaError.shortMessage, execaError.command, commandName),
-      execaError.stack ? replaceCliCommand(execaError.stack, execaError.command, commandName) : undefined
+    const { shortMessage, stack, command } = execaError;
+    return new BitwardenCommandError(
+      redactSensitiveValues(shortMessage, command, commandName, sensitiveValues),
+      stack && redactSensitiveValues(stack, command, commandName, sensitiveValues)
     );
-    return safeError;
   } else {
     return new BitwardenCommandError(`Error executing ${commandName}`, (error as Error).stack);
   }

@@ -8,3 +8,7 @@ export function objectEntries<T extends object>(obj: T) {
 export function isObject(obj: unknown): obj is object {
   return typeof obj === "object" && obj !== null && !Array.isArray(obj);
 }
+
+export function ensureArray<T>(value: T | T[]): T[] {
+  return Array.isArray(value) ? value : [value];
+}

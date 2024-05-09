@@ -47,10 +47,14 @@ const mockCommands = {
   receiveSend: (url: string) => `${mockCliPath} send receive ${url} --foobar`,
 };
 
-const getCommandString = (command: string | ((value: any) => string)) => {
+const getCommandString = (command: string | ((value: any) => string), badSensitiveValue?: string) => {
   if (typeof command === "function") {
-    const sensitiveValue = "POSSIBLE_SENSITIVE_VALUE";
-    return { commandString: command(sensitiveValue), sensitiveValue };
+    const sensitiveValues = ["POSSIBLE_SENSITIVE_VALUE"] as [string];
+    return {
+      commandString: badSensitiveValue ? command(badSensitiveValue) : command(...sensitiveValues),
+      redactedCommandString: command("[REDACTED]"),
+      sensitiveValues,
+    };
   }
   return { commandString: command };
 };
@@ -58,20 +62,59 @@ const getCommandString = (command: string | ((value: any) => string)) => {
 describe("bitwarden.helpers", () => {
   describe("prepareCommandError", () => {
     Object.entries(mockCommands).forEach(([commandName, command]) => {
-      it(`ExecaError thrown by ${commandName} bitwarden command should not contain executed CLI command`, () => {
-        const { commandString, sensitiveValue } = getCommandString(command);
+      it(`error thrown by ${commandName} bitwarden command should be free of sensitive values if defined`, () => {
+        const { sensitiveValues, commandString, redactedCommandString } = getCommandString(command);
         const error = new MockExecaError(commandString, `error: unknown option '--foobar'\n(Did you mean --foobaz?)`);
-        const result = prepareCommandError(commandName, error);
+        const result = prepareCommandError(commandName, error, sensitiveValues);
 
-        if (sensitiveValue) {
-          expect(result.message).not.toContain(sensitiveValue);
-          expect(result.stack).not.toContain(sensitiveValue);
+        if (sensitiveValues) {
+          expect(result.message).not.toEqual(error.message);
+          expect(result.stack).not.toEqual(error.stack);
+
+          // no sensitive values
+          sensitiveValues.forEach((sensitiveValue) => {
+            expect(result.message).not.toContain(sensitiveValue);
+            expect(result.stack).not.toContain(sensitiveValue);
+          });
+          expect(result.message).not.toContain(commandString);
+          expect(result.stack).not.toContain(commandString);
+
+          // has redacted strings
+          expect(result.stack).toContain("[REDACTED]");
+          expect(result.message).toContain("[REDACTED]");
+          expect(result.stack).toContain(redactedCommandString);
+          expect(result.message).toContain(redactedCommandString);
+        } else {
+          expect(result.message).toEqual(error.message);
+          expect(result.stack).toEqual(error.stack);
         }
-        const redactedValue = `${mockCliPath} ${commandName}`;
-        expect(result.message).not.toContain(error.command);
-        expect(result.stack).not.toContain(error.command);
-        expect(result.stack).toContain(redactedValue);
-        expect(result.stack).toContain(error.stderr);
+      });
+    });
+
+    Object.entries(mockCommands).forEach(([commandName, command]) => {
+      if (typeof command !== "function") return;
+
+      it(`should omit whole ${commandName} command if sensitiveValues were defined but the error remained unchanged`, () => {
+        const badSensitiveValue = "MYPASSWORD";
+        const { sensitiveValues, commandString, redactedCommandString } = getCommandString(command, badSensitiveValue);
+
+        const error = new MockExecaError(commandString, `error: unknown option '--foobar'\n(Did you mean --foobaz?)`);
+        const result = prepareCommandError(commandName, error, sensitiveValues);
+
+        expect(commandString).toContain(badSensitiveValue);
+
+        expect(result.message).not.toEqual(error.message);
+        expect(result.stack).not.toEqual(error.stack);
+
+        // no command string, redacted or not
+        sensitiveValues!.forEach((sensitiveValue) => {
+          expect(result.stack).not.toContain(sensitiveValue);
+        });
+        expect(result.message).not.toContain(commandString);
+        expect(result.message).not.toContain(redactedCommandString);
+
+        // has redacted command name string
+        expect(result.stack).toContain(`[${commandName.toUpperCase()}]`);
       });
     });
 

@@ -30,7 +30,8 @@ async function generatePasswordQuickCommand() {
   try {
     const bitwarden = await new Bitwarden(toast).initialize();
     const options = await getPasswordGeneratorOptions();
-    const password = await bitwarden.generatePassword(options);
+    const { result: password, error } = await bitwarden.generatePassword(options);
+    if (error) throw error;
     await actions[generatePasswordQuickAction](password);
   } catch (error) {
     toast.style = Toast.Style.Failure;
