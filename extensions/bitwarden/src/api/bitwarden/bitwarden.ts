@@ -1,11 +1,34 @@
-import { Cache, environment, getPreferenceValues, LocalStorage, open, showToast, Toast } from "@raycast/api";
-import { execa, ExecaChildProcess, ExecaError, ExecaReturnValue, execaSync } from "execa";
-import { accessSync, chmodSync, constants, existsSync, unlinkSync, writeFileSync } from "fs";
+import { environment, getPreferenceValues, LocalStorage, open, showToast, Toast } from "@raycast/api";
+import { execa, ExecaChildProcess, ExecaError, ExecaReturnValue } from "execa";
+import { accessSync, chmodSync, constants, existsSync } from "fs";
 import { chmod, rename, rm } from "fs/promises";
 import { join } from "path";
 import { dirname } from "path/posix";
-import { prepareCommandError, prepareSendPayload } from "./bitwarden.helpers";
+
+import { DEFAULT_SERVER_URL, LOCAL_STORAGE_KEY } from "~/constants/general";
+import { VaultState, VaultStatus } from "~/types/general";
+import { PasswordGeneratorOptions } from "~/types/passwords";
+import { ReceivedSend, Send, SendCreatePayload, SendType } from "~/types/send";
+import { Folder, Item } from "~/types/vault";
+import { captureException } from "~/utils/development";
 import {
+  EnsureCliBinError,
+  InstalledCLINotFoundError,
+  ManuallyThrownError,
+  NotLoggedInError,
+  PremiumFeatureError,
+  SendInvalidPasswordError,
+  SendNeedsPasswordError,
+  VaultIsLockedError,
+} from "~/utils/errors";
+import { decompressFile, removeFilesThatStartWith, unlinkAllSync, waitForFileAvailable } from "~/utils/fs";
+import { download } from "~/utils/network";
+import { getPasswordGeneratingArgs } from "~/utils/passwords";
+import { getServerUrlPreference } from "~/utils/preferences";
+
+import { BwCommand, cliInfo } from "./bitwarden.config";
+import { BinDownloadLogger, prepareCommandError, prepareSendPayload } from "./bitwarden.helpers";
+import type {
   BwCommands,
   BwActionListeners,
   BwActionListenersMap,
@@ -16,91 +39,8 @@ import {
   BwReceiveSendOptions,
   MaybeError,
 } from "./bitwarden.types";
-import { DEFAULT_SERVER_URL, LOCAL_STORAGE_KEY } from "~/constants/general";
-import { VaultState, VaultStatus } from "~/types/general";
-import { PasswordGeneratorOptions } from "~/types/passwords";
-import { ReceivedSend, Send, SendCreatePayload, SendType } from "~/types/send";
-import { Folder, Item } from "~/types/vault";
-import { getFileSha256 } from "~/utils/crypto";
-import { captureException } from "~/utils/development";
-import {
-  EnsureCliBinError,
-  InstalledCLINotFoundError,
-  ManuallyThrownError,
-  NotLoggedInError,
-  PremiumFeatureError,
-  SendInvalidPasswordError,
-  SendNeedsPasswordError,
-  tryExec,
-  VaultIsLockedError,
-} from "~/utils/errors";
-import { decompressFile, removeFilesThatStartWith, unlinkAllSync, waitForFileAvailable } from "~/utils/fs";
-import { download } from "~/utils/network";
-import { getPasswordGeneratingArgs } from "~/utils/passwords";
-import { getServerUrlPreference } from "~/utils/preferences";
 
 const { supportPath } = environment;
-
-const Δ = "3"; // changing this forces a new bin download for people that had a failed one
-const BinDownloadLogger = (() => {
-  /* The idea of this logger is to write a log file when the bin download fails, so that we can let the extension crash,
-   but fallback to the local cli path in the next launch. This allows the error to be reported in the issues dashboard. It uses files to keep it synchronous, as it's needed in the constructor.
-   Although, the plan is to discontinue this method, if there's a better way of logging errors in the issues dashboard
-   or there are no crashes reported with the bin download after some time. */
-  const filePath = join(supportPath, `bw-bin-download-error-${Δ}.log`);
-  return {
-    logError: (error: any) => tryExec(() => writeFileSync(filePath, error?.message ?? "Unexpected error")),
-    clearError: () => tryExec(() => unlinkSync(filePath)),
-    hasError: () => tryExec(() => existsSync(filePath), false),
-  };
-})();
-
-export const cliInfo = {
-  version: "2024.4.0",
-  sha256: "db23024b6108458870494ab889c63d9a4ec60fbc620525e40cdadeeea58c50a4",
-  downloadPage: "https://github.com/bitwarden/clients/releases",
-  path: {
-    arm64: "/opt/homebrew/bin/bw",
-    x64: "/usr/local/bin/bw",
-    get downloadedBin() {
-      return join(supportPath, cliInfo.binFilename);
-    },
-    get installedBin() {
-      return process.arch === "arm64" ? this.arm64 : this.x64;
-    },
-    get bin() {
-      // TODO: Remove this when the issue is resolved
-      // CLI bin download is off for arm64 until bitwarden releases arm binaries
-      // https://github.com/bitwarden/clients/pull/2976
-      // https://github.com/bitwarden/clients/pull/7338
-      if (process.arch === "arm64") {
-        const cache = new Cache();
-        try {
-          if (!existsSync(this.downloadedBin)) throw new Error("No downloaded bin");
-          if (cache.get("downloadedBinWorks") === "true") return this.downloadedBin;
-
-          execaSync(this.downloadedBin, ["--version"]);
-          cache.set("downloadedBinWorks", "true");
-          return this.downloadedBin;
-        } catch {
-          cache.set("downloadedBinWorks", "false");
-          return this.installedBin;
-        }
-      }
-
-      return !BinDownloadLogger.hasError() ? this.downloadedBin : this.installedBin;
-    },
-  },
-  get binFilename() {
-    return `bw-${this.version}`;
-  },
-  get downloadUrl() {
-    return `${this.downloadPage}/download/cli-v${this.version}/bw-macos-${this.version}.zip`;
-  },
-  checkHashMatchesFile: function (filePath: string) {
-    return getFileSha256(filePath) === this.sha256;
-  },
-} as const;
 
 export class Bitwarden implements BwCommands {
   private env: BwEnv;
@@ -217,10 +157,11 @@ export class Bitwarden implements BwCommands {
     return this;
   }
 
-  async checkServerUrl(serverUrl: string): Promise<void> {
+  async checkServerUrl(url: string): Promise<MaybeError> {
     // Check the CLI has been configured to use the preference Url
     const cliServer = (await LocalStorage.getItem<string>(LOCAL_STORAGE_KEY.SERVER_URL)) || "";
-    if (cliServer === serverUrl) return;
+    if (cliServer === url) return { result: undefined };
+    const serverUrl = url || DEFAULT_SERVER_URL;
 
     // Update the server Url
     const toast = await this.showToast({
@@ -235,12 +176,14 @@ export class Bitwarden implements BwCommands {
         // It doesn't matter if we weren't logged in.
       }
       // If URL is empty, set it to the default
-      await this.exec(["config", "server", serverUrl || DEFAULT_SERVER_URL], { resetVaultTimeout: false });
+      await this.exec(BwCommand.checkServerUrl(serverUrl), { resetVaultTimeout: false });
       await LocalStorage.setItem(LOCAL_STORAGE_KEY.SERVER_URL, serverUrl);
 
       toast.style = Toast.Style.Success;
       toast.title = "Success";
       toast.message = "Bitwarden server changed";
+
+      return { result: undefined };
     } catch (error) {
       toast.style = Toast.Style.Failure;
       toast.title = "Failed to switch server";
@@ -249,6 +192,9 @@ export class Bitwarden implements BwCommands {
       } else {
         toast.message = "Unknown error occurred";
       }
+      const { handledError } = await this.handleCommonErrors(error);
+      if (handledError) return { error: handledError };
+      throw prepareCommandError("Check Server URL", error, [serverUrl]);
     } finally {
       await toast.restore();
     }
@@ -281,7 +227,7 @@ export class Bitwarden implements BwCommands {
 
   async login(): Promise<MaybeError> {
     try {
-      await this.exec(["login", "--apikey"], { resetVaultTimeout: true });
+      await this.exec(BwCommand.login, { resetVaultTimeout: true });
       await this.saveLastVaultStatus("login", "unlocked");
       await this.callActionListeners("login");
       return { result: undefined };
@@ -297,7 +243,7 @@ export class Bitwarden implements BwCommands {
     try {
       if (immediate) await this.handlePostLogout(reason);
 
-      await this.exec(["logout"], { resetVaultTimeout: false });
+      await this.exec(BwCommand.logout, { resetVaultTimeout: false });
       await this.saveLastVaultStatus("logout", "unauthenticated");
       if (!immediate) await this.handlePostLogout(reason);
       return { result: undefined };
@@ -318,7 +264,7 @@ export class Bitwarden implements BwCommands {
         if (result.status === "unauthenticated") return { error: new NotLoggedInError("Not logged in") };
       }
 
-      await this.exec(["lock"], { resetVaultTimeout: false });
+      await this.exec(BwCommand.lock, { resetVaultTimeout: false });
       await this.saveLastVaultStatus("lock", "locked");
       if (!immediate) await this.callActionListeners("lock", reason);
       return { result: undefined };
@@ -331,7 +277,7 @@ export class Bitwarden implements BwCommands {
 
   async unlock(password: string): Promise<MaybeError<string>> {
     try {
-      const { stdout: sessionToken } = await this.exec(["unlock", password, "--raw"], { resetVaultTimeout: true });
+      const { stdout: sessionToken } = await this.exec(BwCommand.unlock(password), { resetVaultTimeout: true });
       this.setSessionToken(sessionToken);
       await this.saveLastVaultStatus("unlock", "unlocked");
       await this.callActionListeners("unlock", password, sessionToken);
@@ -345,7 +291,7 @@ export class Bitwarden implements BwCommands {
 
   async sync(): Promise<MaybeError> {
     try {
-      await this.exec(["sync"], { resetVaultTimeout: true });
+      await this.exec(BwCommand.sync, { resetVaultTimeout: true });
       return { result: undefined };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -356,7 +302,7 @@ export class Bitwarden implements BwCommands {
 
   async getItem(id: string): Promise<MaybeError<Item>> {
     try {
-      const { stdout } = await this.exec(["get", "item", id], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.getItem(id), { resetVaultTimeout: true });
       return { result: JSON.parse<Item>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -367,7 +313,7 @@ export class Bitwarden implements BwCommands {
 
   async listItems(): Promise<MaybeError<Item[]>> {
     try {
-      const { stdout } = await this.exec(["list", "items"], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.listItems, { resetVaultTimeout: true });
       const items = JSON.parse<Item[]>(stdout);
       // Filter out items without a name property (they are not displayed in the bitwarden app)
       return { result: items.filter((item: Item) => !!item.name) };
@@ -380,7 +326,7 @@ export class Bitwarden implements BwCommands {
 
   async listFolders(): Promise<MaybeError<Folder[]>> {
     try {
-      const { stdout } = await this.exec(["list", "folders"], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.listFolders, { resetVaultTimeout: true });
       return { result: JSON.parse<Folder[]>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -398,7 +344,7 @@ export class Bitwarden implements BwCommands {
       const { result: encodedFolder, error: encodeError } = await this.encode(JSON.stringify(folder));
       if (encodeError) throw encodeError;
 
-      await this.exec(["create", "folder", encodedFolder], { resetVaultTimeout: true });
+      await this.exec(BwCommand.createFolder(encodedFolder), { resetVaultTimeout: true });
       return { result: undefined };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -410,7 +356,7 @@ export class Bitwarden implements BwCommands {
   async getTotp(id: string): Promise<MaybeError<string>> {
     try {
       // this could return something like "Not found." but checks for totp code are done before calling this function
-      const { stdout } = await this.exec(["get", "totp", id], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.getTotp(id), { resetVaultTimeout: true });
       return { result: stdout };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -421,7 +367,7 @@ export class Bitwarden implements BwCommands {
 
   async status(): Promise<MaybeError<VaultState>> {
     try {
-      const { stdout } = await this.exec(["status"], { resetVaultTimeout: false });
+      const { stdout } = await this.exec(BwCommand.status, { resetVaultTimeout: false });
       return { result: JSON.parse<VaultState>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -432,7 +378,7 @@ export class Bitwarden implements BwCommands {
 
   async checkLockStatus(): Promise<VaultStatus> {
     try {
-      await this.exec(["unlock", "--check"], { resetVaultTimeout: false });
+      await this.exec(BwCommand.checkLockStatus, { resetVaultTimeout: false });
       await this.saveLastVaultStatus("checkLockStatus", "unlocked");
       return "unlocked";
     } catch (error) {
@@ -448,7 +394,7 @@ export class Bitwarden implements BwCommands {
 
   async getTemplate<T = any>(type: string): Promise<MaybeError<T>> {
     try {
-      const { stdout } = await this.exec(["get", "template", type], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.getTemplate(type), { resetVaultTimeout: true });
       return { result: JSON.parse<T>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -459,7 +405,7 @@ export class Bitwarden implements BwCommands {
 
   async encode(input: string): Promise<MaybeError<string>> {
     try {
-      const { stdout } = await this.exec(["encode"], { input, resetVaultTimeout: false });
+      const { stdout } = await this.exec(BwCommand.encode, { input, resetVaultTimeout: false });
       return { result: stdout };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -474,7 +420,10 @@ export class Bitwarden implements BwCommands {
   ): Promise<MaybeError<string>> {
     try {
       const args = options ? getPasswordGeneratingArgs(options) : [];
-      const { stdout } = await this.exec(["generate", ...args], { abortController, resetVaultTimeout: false });
+      const { stdout } = await this.exec(BwCommand.generatePassword(...args), {
+        abortController,
+        resetVaultTimeout: false,
+      });
       return { result: stdout };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -485,7 +434,7 @@ export class Bitwarden implements BwCommands {
 
   async listSends(): Promise<MaybeError<Send[]>> {
     try {
-      const { stdout } = await this.exec(["send", "list"], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.listSends, { resetVaultTimeout: true });
       return { result: JSON.parse<Send[]>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -507,7 +456,7 @@ export class Bitwarden implements BwCommands {
       if (encodeError) throw encodeError;
       commandPayload = encodedPayload;
 
-      const { stdout } = await this.exec(["send", "create", encodedPayload], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.createSend(encodedPayload), { resetVaultTimeout: true });
 
       return { result: JSON.parse<Send>(stdout) };
     } catch (error) {
@@ -524,7 +473,7 @@ export class Bitwarden implements BwCommands {
       if (encodeError) throw encodeError;
       commandPayload = encodedPayload;
 
-      const { stdout } = await this.exec(["send", "edit", encodedPayload], { resetVaultTimeout: true });
+      const { stdout } = await this.exec(BwCommand.editSend(encodedPayload), { resetVaultTimeout: true });
       return { result: JSON.parse<Send>(stdout) };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -535,7 +484,7 @@ export class Bitwarden implements BwCommands {
 
   async deleteSend(id: string): Promise<MaybeError> {
     try {
-      await this.exec(["send", "delete", id], { resetVaultTimeout: true });
+      await this.exec(BwCommand.deleteSend(id), { resetVaultTimeout: true });
       return { result: undefined };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -546,7 +495,7 @@ export class Bitwarden implements BwCommands {
 
   async removeSendPassword(id: string): Promise<MaybeError> {
     try {
-      await this.exec(["send", "remove-password", id], { resetVaultTimeout: true });
+      await this.exec(BwCommand.removeSendPassword(id), { resetVaultTimeout: true });
       return { result: undefined };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);
@@ -558,7 +507,7 @@ export class Bitwarden implements BwCommands {
   async receiveSendInfo(url: string, options?: BwReceiveSendOptions): Promise<MaybeError<ReceivedSend>> {
     const { password } = options ?? {};
     try {
-      const { stdout, stderr } = await this.exec(["send", "receive", url, "--obj"], {
+      const { stdout, stderr } = await this.exec(BwCommand.receiveSendInfo(url), {
         resetVaultTimeout: true,
         input: password,
       });
@@ -580,9 +529,10 @@ export class Bitwarden implements BwCommands {
   async receiveSend(url: string, options?: BwReceiveSendOptions): Promise<MaybeError<string>> {
     const { savePath, password } = options ?? {};
     try {
-      const args = ["send", "receive", url];
-      if (savePath) args.push("--output", savePath);
-      const { stdout } = await this.exec(args, { resetVaultTimeout: true, input: password });
+      const { stdout } = await this.exec(BwCommand.receiveSend(url, savePath), {
+        resetVaultTimeout: true,
+        input: password,
+      });
       return { result: stdout };
     } catch (error) {
       const { handledError } = await this.handleCommonErrors(error);

@@ -4,3 +4,7 @@ export const capitalize = (value: string, lowercaseRest = false) => {
 
   return firstLetter + rest;
 };
+
+export const toScreamingCase = (value: string) => {
+  return value.replace(/\s+/g, "_").replace(/-/g, "_").toUpperCase();
+};

@@ -1,3 +1,4 @@
+import { BwCommand } from "~/api/bitwarden/bitwarden.config";
 import { prepareCommandError } from "./bitwarden.helpers";
 import { BwCommands } from "./bitwarden.types";
 
@@ -27,30 +28,14 @@ class MockExecaError extends Error {
 type CommandDefinition = string | ((value: any) => string);
 
 const mockCliPath = "/opt/homebrew/bin/bw";
-const mockCommands: Record<keyof BwCommands, CommandDefinition> = {
-  login: `${mockCliPath} login --apikey`,
-  logout: `${mockCliPath} logout`,
-  lock: `${mockCliPath} lock`,
-  unlock: (password: string) => `${mockCliPath} unlock ${password} --raw`,
-  sync: `${mockCliPath} sync`,
-  getItem: (id: string) => `${mockCliPath} get items ${id}`,
-  listItems: `${mockCliPath} list items`,
-  listFolders: `${mockCliPath} list folders`,
-  createFolder: (payload: string) => `${mockCliPath} create folder ${payload}`,
-  getTotp: (id: string) => `${mockCliPath} get totp ${id}`,
-  status: `${mockCliPath} status`,
-  checkLockStatus: `${mockCliPath} unlock --check`,
-  getTemplate: `${mockCliPath} get template folder`,
-  encode: `${mockCliPath} encode`,
-  generatePassword: `${mockCliPath} generate --length 20`,
-  listSends: `${mockCliPath} send list`,
-  createSend: (payload: string) => `${mockCliPath} send create ${payload}`,
-  editSend: (payload: string) => `${mockCliPath} send edit ${payload}`,
-  deleteSend: (id: string) => `${mockCliPath} send delete ${id}`,
-  removeSendPassword: (id: string) => `${mockCliPath} send remove-password ${id}`,
-  receiveSendInfo: (url: string) => `${mockCliPath} send receive ${url}`,
-  receiveSend: (url: string) => `${mockCliPath} send receive ${url}`,
-};
+const mockCommands: Record<keyof BwCommands, CommandDefinition> = Object.fromEntries(
+  Object.entries(BwCommand).map(([key, value]) =>
+    typeof value === "function"
+      ? [key, (...args: Parameters<typeof value>) => `${mockCliPath} ${(value as any)(...args).join(" ")}`]
+      : [key, `${mockCliPath} ${value.join(" ")}`]
+  )
+);
+
 const mockStderr = `error: unknown option '--foobar'\n(Did you mean --foobaz?)`;
 
 type GetCommandStringReturn = {

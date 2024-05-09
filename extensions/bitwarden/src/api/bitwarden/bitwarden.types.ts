@@ -1,8 +1,8 @@
-import { VaultState, VaultStatus } from "~/types/general";
-import { PasswordGeneratorOptions } from "~/types/passwords";
-import { ReceivedSend, Send, SendCreatePayload } from "~/types/send";
-import { Folder, Item } from "~/types/vault";
-import { ManuallyThrownError } from "~/utils/errors";
+import type { VaultState, VaultStatus } from "~/types/general";
+import type { PasswordGeneratorOptions } from "~/types/passwords";
+import type { ReceivedSend, Send, SendCreatePayload } from "~/types/send";
+import type { Folder, Item } from "~/types/vault";
+import type { ManuallyThrownError } from "~/utils/errors";
 
 export type BwEnv = {
   BITWARDENCLI_APPDATA_DIR: string;
@@ -41,6 +41,7 @@ export type BwReceiveSendOptions = {
 };
 
 export type BwCommands = {
+  checkServerUrl: (url: string) => Promise<MaybeError>;
   login: () => Promise<MaybeError>;
   logout: (options?: BwLogoutOptions) => Promise<MaybeError>;
   lock: (options?: BwLockOptions) => Promise<MaybeError>;
