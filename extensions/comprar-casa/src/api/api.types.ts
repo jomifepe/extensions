@@ -1,7 +1,9 @@
+export type Agencies = "remax";
+
 export type Pagination = {
   page?: number;
   pageSize?: number;
-}
+};
 
 export type ListingResult = {
   totalPages: number;
@@ -9,7 +11,7 @@ export type ListingResult = {
   page: number;
   pageSize: number;
   results: Listing[];
-}
+};
 
 export type Listing = {
   title: string;
@@ -19,4 +21,4 @@ export type Listing = {
   image: string;
   images: string[];
   location: string;
-}
+};

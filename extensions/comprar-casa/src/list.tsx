@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { ActionPanel, Action, Icon, Grid } from "@raycast/api";
-import { Listing } from "./api/api.types";
+import { Agencies, Listing } from "./api/api.types";
 import { useFetchListings } from "./api";
+import { useCachedState } from "@raycast/utils";
 
 type GridItemProps = {
   listing: Listing;
+  onColumnsChange: () => void;
 };
 
 function GridItem(props: GridItemProps) {
-  const { listing } = props;
+  const { listing, onColumnsChange } = props;
   const [imageIndex, setImageIndex] = useState(0);
 
   const pictureCount = listing.images.length;
@@ -34,31 +36,47 @@ function GridItem(props: GridItemProps) {
             shortcut={{ modifiers: ["cmd"], key: "arrowLeft" }}
             onAction={() => setImageIndex((imageIndex - 1 + pictureCount) % pictureCount)}
           />
+          <ActionPanel.Section title="List Actions">
+            <Action
+              title="Change Columns"
+              icon={Icon.AppWindowGrid2x2}
+              shortcut={{ modifiers: ["cmd"], key: "c" }}
+              onAction={onColumnsChange}
+            />
+          </ActionPanel.Section>
         </ActionPanel>
       }
     />
   );
 }
 
+const columns = [3, 5, 8];
+
 export default function Command() {
-  const [columns, setColumns] = useState(5);
-  const { data, isLoading } = useFetchListings("remax");
+  const [columnsIndex, setColumnsIndex] = useCachedState("columnsIndex", 0);
+  const [agency, setAgency] = useState<Agencies>("remax");
+  const { data, isLoading } = useFetchListings(agency);
 
   return (
     <Grid
-      columns={columns}
+      columns={columns[columnsIndex]}
       inset={Grid.Inset.Small}
       isLoading={isLoading}
       fit={Grid.Fit.Fill}
       searchBarAccessory={
-        <Grid.Dropdown tooltip="Grid Item Size" storeValue onChange={(newValue) => setColumns(parseInt(newValue))}>
-          <Grid.Dropdown.Item title="Large" value={"3"} />
-          <Grid.Dropdown.Item title="Medium" value={"5"} />
-          <Grid.Dropdown.Item title="Small" value={"8"} />
+        <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
+          <Grid.Dropdown.Item title="Remax" value="remax" />
         </Grid.Dropdown>
       }
     >
-      {!isLoading && data?.results.map((listing) => <GridItem key={listing.id} listing={listing} />)}
+      {!isLoading &&
+        data?.results.map((listing) => (
+          <GridItem
+            key={listing.id}
+            listing={listing}
+            onColumnsChange={() => setColumnsIndex((index) => (index + 1) % columns.length)}
+          />
+        ))}
     </Grid>
   );
 }
