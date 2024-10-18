@@ -11,17 +11,20 @@ export default function ListCommand() {
   const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
   const { data, isLoading, pagination, revalidate } = useFetchListings(agency);
 
+  console.log(pagination)
+
   return (
     <Grid
       columns={columns[columnsIndex]}
-      inset={Grid.Inset.Small}
+      inset={Grid.Inset.Zero}
       isLoading={isLoading}
-      fit={Grid.Fit.Fill}
+      fit={Grid.Fit.Contain}
       pagination={pagination}
       searchBarAccessory={
         <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
           <Grid.Dropdown.Item title="Remax" value="remax" />
           <Grid.Dropdown.Item title="Idealista" value="idealista" />
+          <Grid.Dropdown.Item title="Imoveis+" value="imoveisMais" />
         </Grid.Dropdown>
       }
     >
