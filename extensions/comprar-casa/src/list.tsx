@@ -21,6 +21,7 @@ export default function ListCommand() {
       searchBarAccessory={
         <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
           <Grid.Dropdown.Item title="Remax" value="remax" />
+          <Grid.Dropdown.Item title="Idealista" value="idealista" />
         </Grid.Dropdown>
       }
     >
@@ -58,29 +59,34 @@ function GridItem(props: GridItemProps) {
   const { listing, onColumnsChange, onRefresh } = props;
   const [imageIndex, setImageIndex] = useState(0);
 
-  const pictureCount = listing.images.length;
+  const pictureCount = listing.images?.length ?? 0;
+  const image = listing.images?.[imageIndex] ?? listing.image;
 
   return (
     <Grid.Item
       key={listing.id}
-      content={{ source: listing.images[imageIndex], fallback: Icon.Image }}
+      content={{ source: image ?? Icon.Image, fallback: Icon.Image }}
       title={listing.title}
-      subtitle={`${listing.price} ${listing.location}`}
+      subtitle={`${listing.price} ${listing.location ?? ''}`}
       actions={
         <ActionPanel>
           <Action.OpenInBrowser url={listing.url} />
-          <Action
-            title="Next Image"
-            icon={Icon.ArrowRight}
-            shortcut={{ modifiers: ["cmd"], key: "arrowRight" }}
-            onAction={() => setImageIndex((imageIndex + 1) % pictureCount)}
-          />
-          <Action
-            title="Previous Image"
-            icon={Icon.ArrowLeft}
-            shortcut={{ modifiers: ["cmd"], key: "arrowLeft" }}
-            onAction={() => setImageIndex((imageIndex - 1 + pictureCount) % pictureCount)}
-          />
+          {pictureCount > 1 && (
+            <>
+              <Action
+                title="Next Image"
+                icon={Icon.ArrowRight}
+                shortcut={{ modifiers: ["cmd"], key: "arrowRight" }}
+                onAction={() => setImageIndex((imageIndex + 1) % pictureCount)}
+              />
+              <Action
+                title="Previous Image"
+                icon={Icon.ArrowLeft}
+                shortcut={{ modifiers: ["cmd"], key: "arrowLeft" }}
+                onAction={() => setImageIndex((imageIndex - 1 + pictureCount) % pictureCount)}
+              />
+            </>
+          )}
           <ActionPanel.Section title="List Actions">
             <Action
               title="Refresh Listings"

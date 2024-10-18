@@ -1,10 +1,10 @@
-import { PaginationOptions } from "@raycast/utils/dist/types";
-import { PaginatedListings } from "./api.types";
+import { ApiFetcherOptions, PaginatedListings } from "./api.types";
 import { RemaxListing } from "./remax.types";
 import fetch from "cross-fetch";
 
-export const fetchRemaxListings = async (pagination?: PaginationOptions): Promise<PaginatedListings> => {
-  const { page = 1 } = pagination ?? {};
+export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<PaginatedListings> => {
+  const { pagination, abortController } = options ?? {};
+  const { page = 0 } = pagination ?? {};
 
   const result = await fetch("https://www.remax.pt/api/Listing/PaginatedMultiMatchSearch", {
     method: "POST",
@@ -63,15 +63,17 @@ export const fetchRemaxListings = async (pagination?: PaginationOptions): Promis
       sort: ["-ContractDate"],
       searchValue: "Leiria",
     }),
+    signal: abortController?.signal,
   });
 
-  if (!result.ok) throw new Error("Failed to fetch listings");
+  if (!result.ok) throw new Error("Failed to fetch listings from Remax");
 
   const data = (await result.json()) as RemaxListing;
 
   return {
     data: data.results.map((item) => ({
       id: String(item.id),
+      type: `T${item.numberOfBedrooms}`,
       title: item.customDisplayTitle,
       price: item.listingPriceText,
       image: `https://i.maxwork.pt/l-search/${item.listingPictureUrl}`,

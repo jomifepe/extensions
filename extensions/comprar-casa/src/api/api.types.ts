@@ -1,4 +1,9 @@
-export type Agencies = "remax";
+export type Agencies = "remax" | "idealista";
+
+export type ApiFetcherOptions = {
+  pagination?: Pagination;
+  abortController?: AbortController;
+}
 
 export type Pagination = {
   page?: number;
@@ -8,7 +13,7 @@ export type Pagination = {
 export type PaginatedListings = {
   data: Listing[];
   hasMore: boolean;
-}
+};
 
 export type ListingResult = {
   totalPages: number;
@@ -19,11 +24,12 @@ export type ListingResult = {
 };
 
 export type Listing = {
+  id: string;
+  type: string;
+  url: string;
   title: string;
   price: string;
-  id: string;
-  url: string;
-  image: string;
-  images: string[];
-  location: string;
+  image?: string;
+  images?: string[];
+  location?: string;
 };
