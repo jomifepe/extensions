@@ -1,9 +1,10 @@
-import { ListingResult, Pagination } from "./api.types";
+import { PaginationOptions } from "@raycast/utils/dist/types";
+import { PaginatedListings } from "./api.types";
 import { RemaxListing } from "./remax.types";
 import fetch from "cross-fetch";
 
-export async function fetchRemaxListings(pagination?: Pagination): Promise<ListingResult> {
-  const { page = 1, pageSize = 20 } = pagination ?? {};
+export const fetchRemaxListings = async (pagination?: PaginationOptions): Promise<PaginatedListings> => {
+  const { page = 1 } = pagination ?? {};
 
   const result = await fetch("https://www.remax.pt/api/Listing/PaginatedMultiMatchSearch", {
     method: "POST",
@@ -27,6 +28,24 @@ export async function fetchRemaxListings(pagination?: Pagination): Promise<Listi
           value: "523",
         },
         {
+          field: "listingTypeID",
+          operationType: "multiple",
+          operator: "=",
+          value: "1,11,3,24",
+        },
+        {
+          field: "listingPrice",
+          operationType: "int",
+          operator: "Range",
+          value: "100000;250000",
+        },
+        {
+          field: "numberOfBedrooms",
+          operationType: "int",
+          operator: "Range",
+          value: "2;",
+        },
+        {
           field: "listingClassID",
           operationType: "int",
           operator: "=",
@@ -39,8 +58,8 @@ export async function fetchRemaxListings(pagination?: Pagination): Promise<Listi
           value: "false",
         },
       ],
-      pageNumber: page,
-      pageSize: pageSize,
+      pageNumber: page + 1,
+      pageSize: 20,
       sort: ["-ContractDate"],
       searchValue: "Leiria",
     }),
@@ -51,7 +70,7 @@ export async function fetchRemaxListings(pagination?: Pagination): Promise<Listi
   const data = (await result.json()) as RemaxListing;
 
   return {
-    results: data.results.map((item) => ({
+    data: data.results.map((item) => ({
       id: String(item.id),
       title: item.customDisplayTitle,
       price: item.listingPriceText,
@@ -60,9 +79,6 @@ export async function fetchRemaxListings(pagination?: Pagination): Promise<Listi
       url: `https://www.remax.pt/pt/imoveis/${item.descriptionTags}/${item.listingTitle}`,
       location: item.regionName3 || item.regionName2 || item.regionName1,
     })),
-    page: data.page,
-    pageSize: data.pageSize,
-    totalPages: data.totalPages,
-    total: data.total,
+    hasMore: data.hasNextPage,
   };
-}
+};

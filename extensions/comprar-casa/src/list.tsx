@@ -4,13 +4,58 @@ import { Agencies, Listing } from "./api/api.types";
 import { useFetchListings } from "./api";
 import { useCachedState } from "@raycast/utils";
 
+const columns = [3, 5, 8];
+
+export default function ListCommand() {
+  const [columnsIndex, setColumnsIndex] = useCachedState("columnsIndex", 0);
+  const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
+  const { data, isLoading, pagination, revalidate } = useFetchListings(agency);
+
+  return (
+    <Grid
+      columns={columns[columnsIndex]}
+      inset={Grid.Inset.Small}
+      isLoading={isLoading}
+      fit={Grid.Fit.Fill}
+      pagination={pagination}
+      searchBarAccessory={
+        <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
+          <Grid.Dropdown.Item title="Remax" value="remax" />
+        </Grid.Dropdown>
+      }
+    >
+      <Grid.EmptyView
+        title="No listings found"
+        icon={Icon.QuestionMarkCircle}
+        actions={
+          <Action
+            title="Refresh Listings"
+            icon={Icon.ArrowClockwise}
+            shortcut={{ modifiers: ["cmd"], key: "r" }}
+            onAction={revalidate}
+          />
+        }
+      />
+      {data?.map((listing) => (
+        <GridItem
+          key={listing.id}
+          listing={listing}
+          onColumnsChange={() => setColumnsIndex((index) => (index + 1) % columns.length)}
+          onRefresh={revalidate}
+        />
+      ))}
+    </Grid>
+  );
+}
+
 type GridItemProps = {
   listing: Listing;
   onColumnsChange: () => void;
+  onRefresh: () => void;
 };
 
 function GridItem(props: GridItemProps) {
-  const { listing, onColumnsChange } = props;
+  const { listing, onColumnsChange, onRefresh } = props;
   const [imageIndex, setImageIndex] = useState(0);
 
   const pictureCount = listing.images.length;
@@ -38,6 +83,12 @@ function GridItem(props: GridItemProps) {
           />
           <ActionPanel.Section title="List Actions">
             <Action
+              title="Refresh Listings"
+              icon={Icon.ArrowClockwise}
+              shortcut={{ modifiers: ["cmd"], key: "r" }}
+              onAction={onRefresh}
+            />
+            <Action
               title="Change Columns"
               icon={Icon.AppWindowGrid2x2}
               shortcut={{ modifiers: ["cmd"], key: "c" }}
@@ -47,36 +98,5 @@ function GridItem(props: GridItemProps) {
         </ActionPanel>
       }
     />
-  );
-}
-
-const columns = [3, 5, 8];
-
-export default function Command() {
-  const [columnsIndex, setColumnsIndex] = useCachedState("columnsIndex", 0);
-  const [agency, setAgency] = useState<Agencies>("remax");
-  const { data, isLoading } = useFetchListings(agency);
-
-  return (
-    <Grid
-      columns={columns[columnsIndex]}
-      inset={Grid.Inset.Small}
-      isLoading={isLoading}
-      fit={Grid.Fit.Fill}
-      searchBarAccessory={
-        <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
-          <Grid.Dropdown.Item title="Remax" value="remax" />
-        </Grid.Dropdown>
-      }
-    >
-      {!isLoading &&
-        data?.results.map((listing) => (
-          <GridItem
-            key={listing.id}
-            listing={listing}
-            onColumnsChange={() => setColumnsIndex((index) => (index + 1) % columns.length)}
-          />
-        ))}
-    </Grid>
   );
 }

@@ -5,6 +5,11 @@ export type Pagination = {
   pageSize?: number;
 };
 
+export type PaginatedListings = {
+  data: Listing[];
+  hasMore: boolean;
+}
+
 export type ListingResult = {
   totalPages: number;
   total: number;
