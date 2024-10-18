@@ -5,12 +5,14 @@ import { showToast, Toast } from "@raycast/api";
 import { useRef } from "react";
 import { fetchIdealistaListings } from "./idealista";
 import { fetchImoveisMaisListings } from "./imoveisMais";
+import { fetchImovirtualListings } from "./imovirtual";
 
 type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedListings>;
 const fetchers: Record<Agencies, FetchFn> = {
   remax: fetchRemaxListings,
   idealista: fetchIdealistaListings,
   imoveisMais: fetchImoveisMaisListings,
+  imovirtual: fetchImovirtualListings,
 };
 
 export const useFetchListings = (source: Agencies) => {

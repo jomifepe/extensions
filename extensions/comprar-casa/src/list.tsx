@@ -25,6 +25,7 @@ export default function ListCommand() {
           <Grid.Dropdown.Item title="Remax" value="remax" />
           <Grid.Dropdown.Item title="Idealista" value="idealista" />
           <Grid.Dropdown.Item title="Imoveis+" value="imoveisMais" />
+          <Grid.Dropdown.Item title="Imovirtual" value="imovirtual" />
         </Grid.Dropdown>
       }
     >
