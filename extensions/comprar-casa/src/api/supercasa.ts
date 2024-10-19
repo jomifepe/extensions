@@ -1,10 +1,11 @@
-import { ApiFetcherOptions, Listing, PaginatedListings } from "./api.types";
+import { ApiFetcherOptions, Listing } from "./api.types";
 import { load as loadHtml } from "cheerio";
 import puppeteer from "puppeteer";
+import { PaginatedData } from "../helpers/usePagination";
 
-export const fetchSupercasaListings = async (options?: ApiFetcherOptions): Promise<PaginatedListings> => {
+export const fetchSupercasaListings = async (options?: ApiFetcherOptions): Promise<PaginatedData<Listing>> => {
   const { pagination, abortController } = options ?? {};
-  const pageNumber = (pagination?.page ?? 0) + 1;
+  const pageNumber = pagination?.page ?? 1;
 
   const pBrowser = await puppeteer.launch({ headless: true });
 
@@ -35,7 +36,7 @@ export const fetchSupercasaListings = async (options?: ApiFetcherOptions): Promi
 
       if (!url) return undefined;
 
-      const image = $$.find(".swiper-wrapper").attr("style")?.split('url(')[1]?.split(')')[0];
+      const image = $$.find(".swiper-wrapper").attr("style")?.split("url(")[1]?.split(")")[0];
 
       return {
         id: url,

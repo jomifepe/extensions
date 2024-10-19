@@ -3,23 +3,24 @@ import { ActionPanel, Action, Icon, Grid } from "@raycast/api";
 import { Agencies, Listing } from "./api/api.types";
 import { useFetchListings } from "./api";
 import { useCachedState } from "@raycast/utils";
+import { usePagination } from "./helpers/usePagination";
 
 const columns = [3, 5, 8];
 
 export default function ListCommand() {
   const [columnsIndex, setColumnsIndex] = useCachedState("columnsIndex", 0);
-  const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
-  const { data, isLoading, pagination, revalidate } = useFetchListings(agency);
+  const columnNumber = columns[columnsIndex];
 
-  console.log(pagination)
+  const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
+  const { pagination, ...paginationListProps } = usePagination(columnNumber);
+  const { data, isLoading, revalidate } = useFetchListings(agency, pagination);
 
   return (
     <Grid
-      columns={columns[columnsIndex]}
+      columns={columnNumber}
       inset={Grid.Inset.Zero}
       isLoading={isLoading}
       fit={Grid.Fit.Contain}
-      pagination={pagination}
       searchBarAccessory={
         <Grid.Dropdown tooltip="Agency" storeValue onChange={(value) => setAgency(value as Agencies)}>
           <Grid.Dropdown.Item title="Remax" value="remax" />
@@ -29,6 +30,7 @@ export default function ListCommand() {
           <Grid.Dropdown.Item title="Supercasa" value="supercasa" />
         </Grid.Dropdown>
       }
+      {...paginationListProps}
     >
       <Grid.EmptyView
         title="No listings found"
@@ -69,10 +71,11 @@ function GridItem(props: GridItemProps) {
 
   return (
     <Grid.Item
+      id={listing.id}
       key={listing.id}
       content={{ source: image ?? Icon.Image, fallback: Icon.Image }}
       title={listing.title}
-      subtitle={`${listing.price} ${listing.location ?? ''}`}
+      subtitle={`${listing.price} ${listing.location ?? ""}`}
       actions={
         <ActionPanel>
           <Action.OpenInBrowser url={listing.url} />

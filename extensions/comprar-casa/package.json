@@ -20,7 +20,7 @@
   ],
   "dependencies": {
     "@raycast/api": "^1.84.3",
-    "@raycast/utils": "^1.17.0",
+    "@raycast/utils": "^1.18.0",
     "cheerio": "^1.0.0",
     "cross-fetch": "^4.0.0",
     "puppeteer": "^19.4.1"

@@ -1,14 +1,15 @@
-import { ApiFetcherOptions, Listing, PaginatedListings } from "./api.types";
+import { ApiFetcherOptions, Listing } from "./api.types";
 import { load as loadHtml } from "cheerio";
 import puppeteer from "puppeteer";
+import { PaginatedData } from "../helpers/usePagination";
 
 // this represents the area to search, draw it on the website map and copy the value
 const shape =
   "%28%28_blqFpjeu%40cyBqGayGiR%7BcD%3Fem%40ixHzi%40_%7CE%7C%7ECqkIbpCwpBdtGj%7EFx_CnfE%60VhbE%7BHdkG%7BvCbyA%29%29";
 
-export const fetchIdealistaListings = async (options?: ApiFetcherOptions): Promise<PaginatedListings> => {
+export const fetchIdealistaListings = async (options?: ApiFetcherOptions): Promise<PaginatedData<Listing>> => {
   const { pagination, abortController } = options ?? {};
-  const pageNumber = (pagination?.page ?? 0) + 1;
+  const pageNumber = pagination?.page ?? 1;
 
   const pBrowser = await puppeteer.launch({ headless: true });
 

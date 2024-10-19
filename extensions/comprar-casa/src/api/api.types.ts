@@ -1,19 +1,11 @@
+import { Pagination } from "../helpers/usePagination";
+
 export type Agencies = "remax" | "idealista" | "imoveisMais" | "imovirtual" | "supercasa";
 
 export type ApiFetcherOptions = {
   pagination?: Pagination;
   abortController?: AbortController;
 }
-
-export type Pagination = {
-  page?: number;
-  pageSize?: number;
-};
-
-export type PaginatedListings = {
-  data: Listing[];
-  hasMore: boolean;
-};
 
 export type ListingResult = {
   totalPages: number;

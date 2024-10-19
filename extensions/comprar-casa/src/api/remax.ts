@@ -1,10 +1,11 @@
-import { ApiFetcherOptions, PaginatedListings } from "./api.types";
+import { PaginatedData } from "../helpers/usePagination";
+import { ApiFetcherOptions, Listing } from "./api.types";
 import { RemaxListing } from "./remax.types";
 import fetch from "cross-fetch";
 
-export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<PaginatedListings> => {
+export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<PaginatedData<Listing>> => {
   const { pagination, abortController } = options ?? {};
-  const { page = 0 } = pagination ?? {};
+  const { page = 1 } = pagination ?? {};
 
   const result = await fetch("https://www.remax.pt/api/Listing/PaginatedMultiMatchSearch", {
     method: "POST",
@@ -58,7 +59,7 @@ export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<P
           value: "false",
         },
       ],
-      pageNumber: page + 1,
+      pageNumber: page,
       pageSize: 20,
       sort: ["-ContractDate"],
       searchValue: "Leiria",

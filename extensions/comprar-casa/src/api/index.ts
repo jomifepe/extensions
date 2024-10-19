@@ -1,14 +1,16 @@
 import { useCachedPromise } from "@raycast/utils";
 import { fetchRemaxListings } from "./remax";
-import { Agencies, ApiFetcherOptions, PaginatedListings } from "./api.types";
+import { Agencies, ApiFetcherOptions, Listing } from "./api.types";
 import { showToast, Toast } from "@raycast/api";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchIdealistaListings } from "./idealista";
 import { fetchImoveisMaisListings } from "./imoveisMais";
 import { fetchImovirtualListings } from "./imovirtual";
 import { fetchSupercasaListings } from "./supercasa";
+import { PaginationOptions } from "@raycast/utils/dist/types";
+import { PaginatedData, UsePromisePaginationOptions } from "../helpers/usePagination";
 
-type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedListings>;
+type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedData<Listing>>;
 const fetchers: Record<Agencies, FetchFn> = {
   remax: fetchRemaxListings,
   idealista: fetchIdealistaListings,
@@ -17,23 +19,35 @@ const fetchers: Record<Agencies, FetchFn> = {
   supercasa: fetchSupercasaListings,
 };
 
-export const useFetchListings = (source: Agencies) => {
-  const toastRef = useRef<Toast>();
-  const abortable = useRef<AbortController>();
+export const useFetchListings = (source: Agencies, paginationProps: UsePromisePaginationOptions<Listing>) => {
   const fetcher = fetchers[source];
 
-  return useCachedPromise(
-    (fetch: FetchFn) => (pagination) => fetch({ pagination, abortController: abortable.current }),
-    [fetcher],
+  const toastRef = useRef<Toast>();
+  const abortable = useRef<AbortController>();
+  const [data, setData] = useState<Listing[]>();
+
+  const { data: _, ...result } = useCachedPromise(
+    (fetch: FetchFn, pagination: PaginationOptions) => fetch({ pagination, abortController: abortable.current }),
+    [fetcher, paginationProps.pagination],
     {
-      execute: !!fetcher,
       onWillExecute: async () => {
-        toastRef.current = await showToast({ style: Toast.Style.Animated, title: "Fetching listings..." });
+        const { page } = paginationProps.pagination;
+        const title = page > 1 ? "Fetching more listings..." : "Fetching listings...";
+        const message = page > 1 ? `Page ${page}` : undefined;
+        toastRef.current = await showToast({ style: Toast.Style.Animated, title, message });
       },
-      onData: () => toastRef.current?.hide(),
+      onData: (data) => {
+        paginationProps.onData(data);
+        setData((current) => [...(current ?? []), ...data.data]);
+        toastRef.current?.hide();
+      },
       onError: () => toastRef.current?.hide(),
-      abortable,
       failureToastOptions: { message: "Failed to fetch listings" },
+      abortable,
     },
   );
+
+  useEffect(() => setData(undefined), [fetcher]);
+
+  return { data, ...result };
 };

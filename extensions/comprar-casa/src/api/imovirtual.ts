@@ -1,10 +1,11 @@
-import { ApiFetcherOptions, Listing, PaginatedListings } from "./api.types";
+import { ApiFetcherOptions, Listing } from "./api.types";
 import { load as loadHtml } from "cheerio";
 import puppeteer from "puppeteer";
+import { PaginatedData } from "../helpers/usePagination";
 
-export const fetchImovirtualListings = async (options?: ApiFetcherOptions): Promise<PaginatedListings> => {
+export const fetchImovirtualListings = async (options?: ApiFetcherOptions): Promise<PaginatedData<Listing>> => {
   const { pagination, abortController } = options ?? {};
-  const pageNumber = (pagination?.page ?? 0) + 1;
+  const pageNumber = pagination?.page ?? 1;
 
   const pBrowser = await puppeteer.launch({ headless: true });
 
@@ -51,8 +52,6 @@ export const fetchImovirtualListings = async (options?: ApiFetcherOptions): Prom
     })
     .get()
     .filter(Boolean);
-
-  console.log({ listings });
 
   return {
     data: listings,
