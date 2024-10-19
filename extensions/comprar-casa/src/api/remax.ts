@@ -1,6 +1,6 @@
 import { PaginatedData } from "../helpers/usePagination";
 import { ApiFetcherOptions, Listing } from "./api.types";
-import { RemaxListing } from "./remax.types";
+import { RemaxListingPage } from "./remax.types";
 import fetch from "cross-fetch";
 
 export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<PaginatedData<Listing>> => {
@@ -69,7 +69,7 @@ export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<P
 
   if (!result.ok) throw new Error("Failed to fetch listings from Remax");
 
-  const data = (await result.json()) as RemaxListing;
+  const data = (await result.json()) as RemaxListingPage;
 
   return {
     data: data.results.map((item) => ({

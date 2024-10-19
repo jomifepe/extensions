@@ -1,4 +1,4 @@
-export type RemaxListing = {
+export type RemaxListingPage = {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;

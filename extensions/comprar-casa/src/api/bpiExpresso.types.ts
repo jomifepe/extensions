@@ -1,0 +1,112 @@
+export type BpiExpressoListingPage = {
+  count: number;
+  results: ResultsItem[];
+  page: number;
+  pageSize: number;
+  counters: Counters;
+};
+export type ResultsItem = {
+  id: string;
+  type: string;
+  kind: string;
+  gallery: string[];
+  price: number;
+  rentPrice: null;
+  typology: string;
+  district: string;
+  county: string;
+  town: string;
+  bpiProperty: boolean;
+  highlighted: boolean;
+  partner: Partner;
+  reference: string;
+  title: string;
+  descriptionShort: string;
+  url: string;
+  resultType: string;
+  isFavorite: boolean;
+  isPaa: boolean;
+  geoLocation: GeoLocation;
+  parkingSpaces: number;
+  wc: number;
+  usefulArea: string;
+  energyRating: string;
+  updatedAt: string;
+  area: number;
+  priceChangedAt: null | string;
+};
+export type Partner = {
+  id: number;
+  icon: string | null;
+  iconLarge?: string;
+  website: string;
+  zone: string;
+  email: string;
+  fax: string;
+  postalCode1: string;
+  postalCode2: string;
+  postalCodeLocality: string;
+  address: string;
+  licenseNumber: string;
+  banner: null;
+  extendedName: string;
+  name: string;
+  slug: string;
+  phone: string;
+  isParticular: boolean;
+  premium: boolean;
+  hidePhone: boolean;
+};
+export type GeoLocation = {
+  lat: string;
+  lng: string;
+  exact: boolean;
+};
+export type Counters = {
+  imokind: Imokind;
+  typologies: Typologies;
+  price: Price;
+  area: Area;
+  "price/m2": {
+    min: number;
+    max: number;
+  };
+  higherThanHalfMillionPrice: boolean;
+};
+export type Imokind = {
+  apartment: number;
+  house: number;
+  warehouse: number;
+  office: number;
+  garage: number;
+  store: number;
+  building: number;
+  room: number;
+  farm: number;
+  land: number;
+  tourism: number;
+};
+export type Typologies = {
+  19: number;
+  29: number;
+  39: number;
+  49: number;
+  59: number;
+  69: number;
+  130: number;
+  t0: number;
+  t1: number;
+  t2: number;
+  t3: number;
+  t4: number;
+  t5: number;
+  t5_more: number;
+};
+export type Price = {
+  min: number;
+  max: number;
+};
+export type Area = {
+  min: number;
+  max: number;
+};

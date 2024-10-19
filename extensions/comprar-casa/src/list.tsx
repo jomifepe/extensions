@@ -28,6 +28,7 @@ export default function ListCommand() {
           <Grid.Dropdown.Item title="Imoveis+" value="imoveisMais" />
           <Grid.Dropdown.Item title="Imovirtual" value="imovirtual" />
           <Grid.Dropdown.Item title="Supercasa" value="supercasa" />
+          <Grid.Dropdown.Item title="BPI Expresso" value="bpiExpresso" />
         </Grid.Dropdown>
       }
       {...paginationListProps}

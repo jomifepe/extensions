@@ -9,6 +9,7 @@ import { fetchImovirtualListings } from "./imovirtual";
 import { fetchSupercasaListings } from "./supercasa";
 import { PaginationOptions } from "@raycast/utils/dist/types";
 import { PaginatedData, UsePromisePaginationOptions } from "../helpers/usePagination";
+import { fetchBpiExpressoListings } from "./bpiExpresso";
 
 type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedData<Listing>>;
 const fetchers: Record<Agencies, FetchFn> = {
@@ -17,6 +18,7 @@ const fetchers: Record<Agencies, FetchFn> = {
   imoveisMais: fetchImoveisMaisListings,
   imovirtual: fetchImovirtualListings,
   supercasa: fetchSupercasaListings,
+  bpiExpresso: fetchBpiExpressoListings,
 };
 
 export const useFetchListings = (source: Agencies, paginationProps: UsePromisePaginationOptions<Listing>) => {
