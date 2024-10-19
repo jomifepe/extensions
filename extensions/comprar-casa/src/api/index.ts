@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { fetchIdealistaListings } from "./idealista";
 import { fetchImoveisMaisListings } from "./imoveisMais";
 import { fetchImovirtualListings } from "./imovirtual";
+import { fetchSupercasaListings } from "./supercasa";
 
 type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedListings>;
 const fetchers: Record<Agencies, FetchFn> = {
@@ -13,6 +14,7 @@ const fetchers: Record<Agencies, FetchFn> = {
   idealista: fetchIdealistaListings,
   imoveisMais: fetchImoveisMaisListings,
   imovirtual: fetchImovirtualListings,
+  supercasa: fetchSupercasaListings,
 };
 
 export const useFetchListings = (source: Agencies) => {

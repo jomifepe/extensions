@@ -1,4 +1,4 @@
-export type Agencies = "remax" | "idealista" | "imoveisMais" | "imovirtual";
+export type Agencies = "remax" | "idealista" | "imoveisMais" | "imovirtual" | "supercasa";
 
 export type ApiFetcherOptions = {
   pagination?: Pagination;
