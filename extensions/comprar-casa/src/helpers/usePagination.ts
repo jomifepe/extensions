@@ -12,7 +12,8 @@ export type PaginatedData<T> = {
 
 export type UsePromisePaginationOptions<T> = {
   pagination: Pagination;
-  onData: (data: PaginatedData<T>) => void;
+  onData: (data: PaginatedData<T>, selectedItemId?: string | null) => void;
+  reset: () => void;
 };
 
 export function usePagination<T extends { id: string }>(columns: number) {
@@ -22,9 +23,10 @@ export function usePagination<T extends { id: string }>(columns: number) {
   const onDataResultRef = useRef<PaginatedData<T>>();
   const canFetchAgainRef = useRef(true);
 
-  const onData = (data: PaginatedData<T>) => {
+  const onData = (data: PaginatedData<T>, selectedItemId?: string | null) => {
     onDataResultRef.current = data;
     canFetchAgainRef.current = data.hasMore;
+    if (selectedItemId) setSelectedItemId(selectedItemId);
   };
 
   const onSelectionChange = (id: string | null) => {
@@ -42,8 +44,13 @@ export function usePagination<T extends { id: string }>(columns: number) {
     canFetchAgainRef.current = false;
   };
 
+  const reset = () => {
+    setPage(1);
+    setSelectedItemId(null);
+  };
+
   return {
-    pagination: { pagination: { page }, onData } as UsePromisePaginationOptions<T>,
+    pagination: { pagination: { page }, onData, reset } as UsePromisePaginationOptions<T>,
     selectedItemId: selectedItemId ?? undefined,
     onSelectionChange,
   };

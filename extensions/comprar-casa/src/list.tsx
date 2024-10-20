@@ -13,7 +13,7 @@ export default function ListCommand() {
 
   const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
   const { pagination, ...paginationListProps } = usePagination(columnNumber);
-  const { listings, listingsPageUrl, isLoading, refetch } = useFetchListings(agency, pagination);
+  const { data, listingsPageUrl, isLoading, refetch } = useFetchListings(agency, pagination);
 
   return (
     <Grid
@@ -29,6 +29,7 @@ export default function ListCommand() {
           <Grid.Dropdown.Item title="Imovirtual" value="imovirtual" />
           <Grid.Dropdown.Item title="Supercasa" value="supercasa" />
           <Grid.Dropdown.Item title="BPI Expresso" value="bpiExpresso" />
+          <Grid.Dropdown.Item title="Angariax" value="angariax" />
         </Grid.Dropdown>
       }
       {...paginationListProps}
@@ -45,7 +46,7 @@ export default function ListCommand() {
           />
         }
       />
-      {listings?.map((listing) => (
+      {data?.map((listing) => (
         <GridItem
           key={listing.id}
           listing={listing}
@@ -70,7 +71,10 @@ function GridItem(props: GridItemProps) {
   const [imageIndex, setImageIndex] = useState(0);
 
   const pictureCount = listing.images?.length ?? 0;
-  const image = listing.images?.[imageIndex] ?? listing.image;
+  let image = listing.image ?? listing.images?.[imageIndex];
+  if (listing.images && imageIndex > 0) {
+    image = listing.images[imageIndex];
+  }
 
   return (
     <Grid.Item

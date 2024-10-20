@@ -10,6 +10,7 @@ import { fetchSupercasaListings } from "./supercasa";
 import { PaginationOptions } from "@raycast/utils/dist/types";
 import { PaginatedData, UsePromisePaginationOptions } from "../helpers/usePagination";
 import { fetchBpiExpressoListings } from "./bpiExpresso";
+import { fetchAngariaxListings } from "./angariax";
 
 type FetchFn = (options: ApiFetcherOptions) => Promise<PaginatedData<Listing>>;
 const fetchers: Record<Agencies, FetchFn> = {
@@ -19,6 +20,7 @@ const fetchers: Record<Agencies, FetchFn> = {
   imovirtual: fetchImovirtualListings,
   supercasa: fetchSupercasaListings,
   bpiExpresso: fetchBpiExpressoListings,
+  angariax: fetchAngariaxListings,
 };
 
 export const useFetchListings = (source: Agencies, paginationProps: UsePromisePaginationOptions<Listing>) => {
@@ -26,7 +28,7 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
 
   const toastRef = useRef<Toast>();
   const abortable = useRef<AbortController>();
-  const [listings, setData] = useState<Listing[]>();
+  const [data, setData] = useState<Listing[]>();
 
   const {
     data: fetchData,
@@ -42,9 +44,9 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
         const message = page > 1 ? `Page ${page}` : undefined;
         toastRef.current = await showToast({ style: Toast.Style.Animated, title, message });
       },
-      onData: (data) => {
-        paginationProps.onData(data);
-        setData((current) => [...(current ?? []), ...data.data]);
+      onData: (newData) => {
+        paginationProps.onData(newData, data ? newData.data[0]?.id ?? null : null);
+        setData((current) => [...(current ?? []), ...newData.data]);
         toastRef.current?.hide();
       },
       onError: () => toastRef.current?.hide(),
@@ -53,12 +55,16 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
     },
   );
 
-  useEffect(() => setData(undefined), [fetcher]);
+  useEffect(() => {
+    setData(undefined);
+    paginationProps.reset();
+  }, [fetcher]);
 
   const refetch = () => {
     setData(undefined);
+    paginationProps.reset();
     revalidate();
   };
 
-  return { listings, listingsPageUrl: fetchData?.listingPageUrl, refetch, ...result };
+  return { data: data ?? fetchData?.data, listingsPageUrl: fetchData?.listingPageUrl, refetch, ...result };
 };

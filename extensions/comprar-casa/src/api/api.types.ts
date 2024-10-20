@@ -1,6 +1,6 @@
 import { Pagination } from "../helpers/usePagination";
 
-export type Agencies = "remax" | "idealista" | "imoveisMais" | "imovirtual" | "supercasa" | "bpiExpresso";
+export type Agencies = "remax" | "idealista" | "imoveisMais" | "imovirtual" | "supercasa" | "bpiExpresso" | "angariax";
 
 export type ApiFetcherOptions = {
   pagination?: Pagination;
