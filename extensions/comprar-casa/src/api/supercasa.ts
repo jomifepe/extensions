@@ -17,11 +17,11 @@ export const fetchSupercasaListings = async (options?: ApiFetcherOptions): Promi
   await pPage.setUserAgent(
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
   );
-
+  
   const pagePath = pageNumber > 1 ? `pagina-${pPage}` : "";
-  await pPage.goto(
-    `https://supercasa.pt/comprar-casas/leiria/leiria-pousos-barreira-e-cortes/com-t2,t3,t4,preco-min-100000,preco-max-250000/${pagePath}?ordem=atualizado-desc`,
-  );
+  const listingPageUrl = `https://supercasa.pt/comprar-casas/leiria/leiria-pousos-barreira-e-cortes/com-t2,t3,t4,preco-min-100000,preco-max-250000/${pagePath}?ordem=atualizado-desc`;
+
+  await pPage.goto(listingPageUrl);
   const content = await pPage.content();
   await pBrowser.close();
 
@@ -52,6 +52,7 @@ export const fetchSupercasaListings = async (options?: ApiFetcherOptions): Promi
 
   return {
     data: listings,
+    listingPageUrl,
     hasMore: $("li[title='Go to next Page']:not([aria-disabled='true'])").get().length > 0,
   };
 };

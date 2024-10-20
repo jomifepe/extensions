@@ -18,9 +18,9 @@ export const fetchImoveisMaisListings = async (options?: ApiFetcherOptions): Pro
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
   );
 
-  await pPage.goto(
-    `https://imoveismais.pt/leiria/Imoveis?reference=&imovtn_id=1&imovnature_id=&imovest_id=&distrito_id=10&concelho_id=&freguesia_id=4274&minroom=2&maxroom=&precomin=100000&precomax=250000&areamin=&areamax=&page=${pageNumber}`,
-  );
+  const listingPageUrl = `https://imoveismais.pt/leiria/Imoveis?reference=&imovtn_id=1&imovnature_id=&imovest_id=&distrito_id=10&concelho_id=140&freguesia_id=4274&minroom=2&maxroom=&precomin=100000&precomax=250000&areamin=&areamax=&page=${pageNumber}`;
+
+  await pPage.goto(listingPageUrl);
   const content = await pPage.content();
   await pBrowser.close();
 
@@ -50,6 +50,7 @@ export const fetchImoveisMaisListings = async (options?: ApiFetcherOptions): Pro
 
   return {
     data: listings,
+    listingPageUrl,
     hasMore: $(".pagination li:last-child:not(.disabled)").get().length > 0,
   };
 };

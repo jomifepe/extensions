@@ -26,9 +26,13 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
 
   const toastRef = useRef<Toast>();
   const abortable = useRef<AbortController>();
-  const [data, setData] = useState<Listing[]>();
+  const [listings, setData] = useState<Listing[]>();
 
-  const { data: _, ...result } = useCachedPromise(
+  const {
+    data: fetchData,
+    revalidate,
+    ...result
+  } = useCachedPromise(
     (fetch: FetchFn, pagination: PaginationOptions) => fetch({ pagination, abortController: abortable.current }),
     [fetcher, paginationProps.pagination],
     {
@@ -51,5 +55,10 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
 
   useEffect(() => setData(undefined), [fetcher]);
 
-  return { data, ...result };
+  const refetch = () => {
+    setData(undefined);
+    revalidate();
+  };
+
+  return { listings, listingsPageUrl: fetchData?.listingPageUrl, refetch, ...result };
 };

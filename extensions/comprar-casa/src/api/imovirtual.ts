@@ -14,13 +14,13 @@ export const fetchImovirtualListings = async (options?: ApiFetcherOptions): Prom
   });
 
   const pPage = await pBrowser.newPage();
-  await pPage.setUserAgent( 
+  await pPage.setUserAgent(
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
   );
 
-  await pPage.goto(
-    `https://www.imovirtual.com/pt/resultados/comprar/apartamento/leiria/leiria?ownerTypeSingleSelect=ALL&roomsNumber=%5BTHREE%2CFOUR%2CSIX_OR_MORE%2CFIVE%5D&priceMin=100000&priceMax=250000&by=LATEST&direction=DESC&viewType=listing&mapBounds=39.92263356553851%3B-8.456632214411083%3B39.59721770890154%3B-9.080449623534877&page=${pageNumber}`,
-  );
+  const listingPageUrl = `https://www.imovirtual.com/pt/resultados/comprar/apartamento/leiria/leiria?ownerTypeSingleSelect=ALL&roomsNumber=%5BTHREE%2CFOUR%2CSIX_OR_MORE%2CFIVE%5D&priceMin=100000&priceMax=250000&by=LATEST&direction=DESC&viewType=listing&mapBounds=39.92263356553851%3B-8.456632214411083%3B39.59721770890154%3B-9.080449623534877&page=${pageNumber}`;
+
+  await pPage.goto(listingPageUrl);
   const content = await pPage.content();
   await pBrowser.close();
 
@@ -55,6 +55,7 @@ export const fetchImovirtualListings = async (options?: ApiFetcherOptions): Prom
 
   return {
     data: listings,
+    listingPageUrl,
     hasMore: $("li[title='Go to next Page']:not([aria-disabled='true'])").get().length > 0,
   };
 };

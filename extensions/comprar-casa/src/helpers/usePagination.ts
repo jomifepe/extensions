@@ -6,6 +6,7 @@ export type Pagination = {
 
 export type PaginatedData<T> = {
   data: T[];
+  listingPageUrl: string;
   hasMore: boolean;
 };
 

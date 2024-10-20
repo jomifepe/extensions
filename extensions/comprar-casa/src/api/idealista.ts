@@ -23,9 +23,9 @@ export const fetchIdealistaListings = async (options?: ApiFetcherOptions): Promi
   );
 
   const pagePath = pageNumber > 1 ? `pagina-${pPage}` : "";
-  await pPage.goto(
-    `https://www.idealista.pt/areas/comprar-casas/com-preco-max_250000,preco-min_100000,t2,t3,t4-t5/${pagePath}?ordem=atualizado-desc&shape=${shape}`,
-  );
+  const listingPageUrl = `https://www.idealista.pt/areas/comprar-casas/com-preco-max_250000,preco-min_100000,t2,t3,t4-t5/${pagePath}?ordem=atualizado-desc&shape=${shape}`;
+
+  await pPage.goto(listingPageUrl);
   const content = await pPage.content();
   await pBrowser.close();
 
@@ -55,6 +55,7 @@ export const fetchIdealistaListings = async (options?: ApiFetcherOptions): Promi
 
   return {
     data: listings,
+    listingPageUrl,
     hasMore: $(".pagination li.next").get().length > 0,
   };
 };

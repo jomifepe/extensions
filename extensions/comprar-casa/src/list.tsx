@@ -13,7 +13,7 @@ export default function ListCommand() {
 
   const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
   const { pagination, ...paginationListProps } = usePagination(columnNumber);
-  const { data, isLoading, revalidate } = useFetchListings(agency, pagination);
+  const { listings, listingsPageUrl, isLoading, refetch } = useFetchListings(agency, pagination);
 
   return (
     <Grid
@@ -41,16 +41,17 @@ export default function ListCommand() {
             title="Refresh Listings"
             icon={Icon.ArrowClockwise}
             shortcut={{ modifiers: ["cmd"], key: "r" }}
-            onAction={revalidate}
+            onAction={refetch}
           />
         }
       />
-      {data?.map((listing) => (
+      {listings?.map((listing) => (
         <GridItem
           key={listing.id}
           listing={listing}
+          listingsPageUrl={listingsPageUrl}
           onColumnsChange={() => setColumnsIndex((index) => (index + 1) % columns.length)}
-          onRefresh={revalidate}
+          onRefresh={refetch}
         />
       ))}
     </Grid>
@@ -61,10 +62,11 @@ type GridItemProps = {
   listing: Listing;
   onColumnsChange: () => void;
   onRefresh: () => void;
+  listingsPageUrl?: string;
 };
 
 function GridItem(props: GridItemProps) {
-  const { listing, onColumnsChange, onRefresh } = props;
+  const { listing, onColumnsChange, onRefresh, listingsPageUrl } = props;
   const [imageIndex, setImageIndex] = useState(0);
 
   const pictureCount = listing.images?.length ?? 0;
@@ -80,6 +82,7 @@ function GridItem(props: GridItemProps) {
       actions={
         <ActionPanel>
           <Action.OpenInBrowser url={listing.url} />
+          {!!listingsPageUrl && <Action.OpenInBrowser title="Open Listings Page" url={listingsPageUrl} />}
           {pictureCount > 1 && (
             <>
               <Action
