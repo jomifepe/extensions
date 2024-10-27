@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionPanel, Action, Icon, Grid } from "@raycast/api";
+import { ActionPanel, Action, Icon, Grid, Color } from "@raycast/api";
 import { Agencies, Listing } from "./api/api.types";
 import { useFetchListings } from "./api";
 import { useCachedState } from "@raycast/utils";
@@ -11,7 +11,7 @@ export default function ListCommand() {
   const [columnsIndex, setColumnsIndex] = useCachedState("columnsIndex", 0);
   const columnNumber = columns[columnsIndex];
 
-  const [agency, setAgency] = useCachedState<Agencies>("agency", "remax");
+  const [agency, setAgency] = useState<Agencies>("remax");
   const { pagination, ...paginationListProps } = usePagination(columnNumber);
   const { data, listingsPageUrl, isLoading, refetch } = useFetchListings(agency, pagination);
 
@@ -83,6 +83,11 @@ function GridItem(props: GridItemProps) {
       content={{ source: image ?? Icon.Image, fallback: Icon.Image }}
       title={listing.title}
       subtitle={`${listing.price} ${listing.location ?? ""}`}
+      accessory={
+        listing.isSoldOrReserved
+          ? { icon: { source: Icon.CircleDisabled, tintColor: Color.Red }, tooltip: "Sold or reserved" }
+          : undefined
+      }
       actions={
         <ActionPanel>
           <Action.OpenInBrowser url={listing.url} />

@@ -1,4 +1,4 @@
-import { useCachedPromise } from "@raycast/utils";
+import { useCachedPromise, useCachedState } from "@raycast/utils";
 import { fetchRemaxListings } from "./remax";
 import { Agencies, ApiFetcherOptions, Listing } from "./api.types";
 import { showToast, Toast } from "@raycast/api";
@@ -29,7 +29,9 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
   const toastRef = useRef<Toast>();
   const abortable = useRef<AbortController>();
   const [data, setData] = useState<Listing[]>();
+  const { saveFetchedAt, wasLastFetchedRecently } = useLastFetchedAt();
 
+  const wasRecentlyFetched = wasLastFetchedRecently(source);
   const {
     data: fetchData,
     revalidate,
@@ -39,18 +41,21 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
     [fetcher, paginationProps.pagination],
     {
       onWillExecute: async () => {
+        if (wasRecentlyFetched) return;
         const { page } = paginationProps.pagination;
         const title = page > 1 ? "Fetching more listings..." : "Fetching listings...";
         const message = page > 1 ? `Page ${page}` : undefined;
         toastRef.current = await showToast({ style: Toast.Style.Animated, title, message });
       },
       onData: (newData) => {
-        paginationProps.onData(newData, data ? newData.data[0]?.id ?? null : null);
+        paginationProps.onData(newData, data ? (newData.data[0]?.id ?? null) : null);
         setData((current) => [...(current ?? []), ...newData.data]);
         toastRef.current?.hide();
+        saveFetchedAt(source);
       },
       onError: () => toastRef.current?.hide(),
       failureToastOptions: { message: "Failed to fetch listings" },
+      execute: !wasRecentlyFetched,
       abortable,
     },
   );
@@ -68,3 +73,29 @@ export const useFetchListings = (source: Agencies, paginationProps: UsePromisePa
 
   return { data: data ?? fetchData?.data, listingsPageUrl: fetchData?.listingPageUrl, refetch, ...result };
 };
+
+type LastFetchedAtMap = Record<Agencies, string | null>;
+const lastFetchedAtMapInitialState = Object.fromEntries(
+  Object.entries(fetchers).map(([key]) => [key, null]),
+) as LastFetchedAtMap;
+
+function useLastFetchedAt() {
+  const [lastFetchedAtMap, setLastFetchedAtMap] = useCachedState<LastFetchedAtMap>(
+    "lastFetchedAtMap",
+    lastFetchedAtMapInitialState,
+  );
+
+  const saveFetchedAt = (source: Agencies) => {
+    setLastFetchedAtMap((current) => ({ ...current, [source]: new Date().toISOString() }));
+  };
+
+  const wasLastFetchedRecently = (source: Agencies) => {
+    const lastFetchDate = lastFetchedAtMap[source];
+    if (!lastFetchDate) return false;
+    const lastFetchedAt = new Date(lastFetchDate);
+    if (isNaN(lastFetchedAt.getTime())) return false;
+    return new Date().getTime() - lastFetchedAt.getTime() < 1000 * 60 * 30; // less than 30 minutes ago
+  };
+
+  return { saveFetchedAt, wasLastFetchedRecently };
+}

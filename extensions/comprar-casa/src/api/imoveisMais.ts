@@ -43,6 +43,7 @@ export const fetchImoveisMaisListings = async (options?: ApiFetcherOptions): Pro
         price: $$.find(".block_information .price_imovs").text().trim(),
         type: $$.find(".rooms_wc_area > .info_imovs:first-child").text().trim(),
         location: $$.find(".text-left a").text().trim(),
+        isSoldOrReserved: $$.find(".reserved").length > 0,
       };
     })
     .get()

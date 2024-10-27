@@ -81,6 +81,7 @@ export const fetchRemaxListings = async (options?: ApiFetcherOptions): Promise<P
       images: item.listingPictures.map((picture) => `https://i.maxwork.pt/l-search/${picture}`),
       url: `https://www.remax.pt/pt/imoveis/${item.descriptionTags}/${item.listingTitle}`,
       location: item.regionName3 || item.regionName2 || item.regionName1,
+      isSoldOrReserved: item.isSold
     })),
     listingPageUrl: 'https://www.remax.pt/pt/comprar/imoveis/apartamento/leiria/leiria/r/t2,preco_100000_250000?s=%7B%22rg%22%3A%22Leiria%22%7D&p=1&o=-ContractDate',
     hasMore: data.hasNextPage,

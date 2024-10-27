@@ -54,6 +54,7 @@ export const fetchAngariaxListings = async (options?: ApiFetcherOptions): Promis
         images,
         type: $$.find(".card-imovel_caracteristicas .lbl_valor").first().text().trim(),
         location: $$.find(".subtitulo.card-imovel_localidade").text().trim(),
+        isSoldOrReserved: $$.find(".card-imovel_labels_vendido span").text().length > 0,
       };
     })
     .get()

@@ -24,4 +24,5 @@ export type Listing = {
   image?: string;
   images?: string[];
   location?: string;
+  isSoldOrReserved?: boolean;
 };
