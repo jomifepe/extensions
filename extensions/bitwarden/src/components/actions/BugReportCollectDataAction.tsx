@@ -5,6 +5,7 @@ import { promisify } from "util";
 import { cliInfo } from "~/api/bitwarden";
 import { existsSync } from "fs";
 import { dirname } from "path";
+import { getPlatform } from "~/utils/platform";
 
 const exec = promisify(execWithCallbacks);
 
@@ -94,26 +95,22 @@ function BugReportCollectDataAction() {
     try {
       const preferences = getSafePreferences();
       const bwInfo = getBwBinInfo();
-      const [systemArch, macosVersion, macosBuildVersion, bwVersion, brewInfo] = await Promise.all([
+      const platform = getPlatform();
+      const [systemArch, osVersion, osBuildVersion, bwVersion] = await Promise.all([
         tryExec("uname -m"),
         tryExec("sw_vers -productVersion"),
         tryExec("sw_vers -buildVersion"),
         tryExec(`"${bwInfo.path}" --version`),
-        getHomebrewInfo(),
       ]);
 
-      const data = {
+      const data: Record<string, any> = {
         raycast: {
           version: environment.raycastVersion,
         },
         system: {
           arch: systemArch,
-          version: macosVersion,
-          buildVersion: macosBuildVersion,
-        },
-        homebrew: {
-          arch: brewInfo.arch,
-          version: brewInfo.version,
+          version: osVersion,
+          buildVersion: osBuildVersion,
         },
         node: {
           arch: process.arch,
@@ -125,6 +122,14 @@ function BugReportCollectDataAction() {
         },
         preferences,
       };
+
+      if (platform === "macos") {
+        const brewInfo = await getHomebrewInfo();
+        data.homebrew = {
+          arch: brewInfo.arch,
+          version: brewInfo.version,
+        };
+      }
 
       await Clipboard.copy(JSON.stringify(data, null, 2));
       toast.style = Toast.Style.Success;
