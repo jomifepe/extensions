@@ -1,5 +1,7 @@
 # Bitwarden Changelog
 
+## [Added support for Windows] - {PR_MERGE_DATE}
+
 ## [Improvements] - 2025-09-02
 
 - Sync vault on command launch
