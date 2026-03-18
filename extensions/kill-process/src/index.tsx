@@ -208,10 +208,10 @@ export default function ProcessList() {
         title: `Killed ${processName}`,
         style: Toast.Style.Success,
       });
-    });
 
-    setFetchResult((prev) => prev.filter((p) => p.id !== process.id));
-    performPostKillActions();
+      setFetchResult((prev) => prev.filter((p) => p.id !== process.id));
+      performPostKillActions();
+    });
   };
 
   const killAllProcesses = async (process: Process, force: boolean = false) => {
@@ -250,10 +250,10 @@ export default function ProcessList() {
         title: `Killed all "${processName}" processes`,
         style: Toast.Style.Success,
       });
-    });
 
-    setFetchResult((prev) => prev.filter((p) => p.processName !== processName));
-    performPostKillActions();
+      setFetchResult((prev) => prev.filter((p) => p.processName !== processName));
+      performPostKillActions();
+    });
   };
 
   const subtitleString = (process: Process): string | undefined => {
