@@ -96,7 +96,7 @@ export function getKillAllCommand(processName: string, force = false): string {
     return force ? `taskkill /F /IM "${escaped}"` : `taskkill /IM "${escaped}"`;
   }
   const escaped = processName.replace(/'/g, "'\\''");
-  return force ? `zsh -c 'sudo killall '"'"'${escaped}'"'"''` : `killall '${escaped}'`;
+  return force ? `PROC_NAME='${escaped}' zsh -c 'sudo killall "$PROC_NAME"'` : `killall '${escaped}'`;
 }
 
 /**
