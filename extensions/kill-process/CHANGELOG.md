@@ -1,5 +1,9 @@
 # Kill Process Changelog
 
+## [Added Kill All action] - {PR_MERGE_DATE}
+
+- Added action to kill all processes with the same name
+
 ## [UX Improvements] - 2026-02-11
 
 - Removed the redundant **Default Sort By** preference (sorting is now persisted via the command dropdown)
