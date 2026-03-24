@@ -79,14 +79,29 @@ export class SendInvalidPasswordError extends ManuallyThrownError {
 
 /* -- error utils below -- */
 
-export function tryExec<T>(fn: () => T): T extends void ? T : T | undefined;
-export function tryExec<T, F>(fn: () => T, fallbackValue: F): T | F;
-export function tryExec<T, F>(fn: () => T, fallbackValue?: F): T | F | undefined {
-  try {
-    return fn();
-  } catch {
-    return fallbackValue;
+export function tryOrElse<T>(fn: () => T): T;
+export function tryOrElse<T>(fn: () => Promise<T>): Promise<T>;
+export function tryOrElse<T>(promise: Promise<T>): Promise<T>;
+export function tryOrElse<T, F>(fn: () => T, fallbackValue: F): T | F;
+export function tryOrElse<T, F>(fn: () => Promise<T>, fallbackValue: F): Promise<T | F>;
+export function tryOrElse<T, F>(promise: Promise<T>, fallbackValue: F): Promise<T | F>;
+/** Returns the result of the function or promise, or the fallback value if it fails. */
+export function tryOrElse<T, F>(
+  fnOrPromise: (() => T | Promise<T>) | Promise<T>,
+  fallbackValue?: F
+): T | F | undefined | Promise<T | F | undefined> {
+  if (typeof fnOrPromise === "function") {
+    try {
+      const result = fnOrPromise();
+      if (result instanceof Promise) {
+        return result.catch(() => fallbackValue);
+      }
+      return result;
+    } catch {
+      return fallbackValue;
+    }
   }
+  return fnOrPromise.catch(() => fallbackValue);
 }
 
 export function getDisplayableErrorMessage(error: any) {
@@ -117,18 +132,23 @@ export function Err<E = Error>(error: E): Failure<E> {
 }
 
 export function tryCatch<T, E = Error>(fn: () => T): Result<T, E>;
+export function tryCatch<T, E = Error>(fn: () => Promise<T>): Promise<Result<T, E>>;
 export function tryCatch<T, E = Error>(promise: Promise<T>): Promise<Result<T, E>>;
 /**
  * Executes a function or a promise safely inside a try/catch and
  * returns a `Result` (`[data, error]`).
  */
-export function tryCatch<T, E = Error>(fnOrPromise: (() => T) | Promise<T>): MaybePromise<Result<T, E>> {
+export function tryCatch<T, E = Error>(fnOrPromise: (() => T | Promise<T>) | Promise<T>): MaybePromise<Result<T, E>> {
   if (typeof fnOrPromise === "function") {
     try {
-      return Ok(fnOrPromise());
+      const result = fnOrPromise();
+      if (result instanceof Promise) {
+        return result.then(Ok).catch(Err);
+      }
+      return Ok(result);
     } catch (error: any) {
       return Err(error);
     }
   }
-  return fnOrPromise.then((data) => Ok(data)).catch((error) => Err(error));
+  return fnOrPromise.then(Ok).catch(Err);
 }

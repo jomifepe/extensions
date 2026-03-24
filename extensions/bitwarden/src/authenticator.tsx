@@ -32,9 +32,10 @@ import { ActionWithReprompt, DebuggingBugReportingActionSection, VaultActionsSec
 import { Err, tryCatch } from "~/utils/errors";
 import { useVaultSearch } from "~/utils/search";
 import ListFolderDropdown from "~/components/ListFolderDropdown";
-import ComponentReverser from "~/components/ComponentReverser";
+import ComponentOrderer from "~/components/ComponentOrderer";
 import { useStateEffect } from "~/utils/hooks/useStateEffect";
 import { captureException } from "~/utils/development";
+import { ShowItemDetailsAction } from "~/components/searchVault/actions";
 
 const AuthenticatorCommand = () => (
   <RootErrorBoundary>
@@ -154,10 +155,11 @@ function ListItem({ item }: { item: Item }) {
         actions={
           <ActionPanel>
             {canGenerate ? (
-              <ComponentReverser reverse={preferences.primaryAction === "paste"}>
-                <CopyCodeAction />
-                <PasteCodeAction />
-              </ComponentReverser>
+              <ComponentOrderer first={preferences.primaryAction}>
+                <ShowItemDetailsAction key="showDetails" />
+                <CopyCodeAction key="copy" />
+                <PasteCodeAction key="paste" />
+              </ComponentOrderer>
             ) : (
               <ConfirmAction onConfirm={() => setCanGenerate(true)} />
             )}
