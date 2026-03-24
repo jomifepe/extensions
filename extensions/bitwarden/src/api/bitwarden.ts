@@ -15,11 +15,11 @@ import {
   PremiumFeatureError,
   SendInvalidPasswordError,
   SendNeedsPasswordError,
-  tryOrElse,
+  tryExec,
   VaultIsLockedError,
 } from "~/utils/errors";
 import { join, dirname } from "path";
-import { chmod, rename, rm, unlink } from "fs/promises";
+import { chmod, rename, rm } from "fs/promises";
 import { decompressFile, removeFilesThatStartWith, unlinkAllSync, waitForFileAvailable } from "~/utils/fs";
 import { download } from "~/utils/network";
 import { captureException } from "~/utils/development";
@@ -94,9 +94,9 @@ const BinDownloadLogger = (() => {
    or there are no crashes reported with the bin download after some time. */
   const filePath = join(supportPath, `bw-bin-download-error-${Δ}.log`);
   return {
-    logError: (error: any) => tryOrElse(() => writeFileSync(filePath, error?.message ?? "Unexpected error")),
-    clearError: () => tryOrElse(() => unlinkSync(filePath)),
-    hasError: () => tryOrElse(() => existsSync(filePath), false),
+    logError: (error: any) => tryExec(() => writeFileSync(filePath, error?.message ?? "Unexpected error")),
+    clearError: () => tryExec(() => unlinkSync(filePath)),
+    hasError: () => tryExec(() => existsSync(filePath), false),
   };
 })();
 
@@ -216,7 +216,7 @@ export class Bitwarden {
 
         // clear the data.json file to avoid issues with the new binary
         const dataJsonPath = join(supportPath, "data.json");
-        await tryOrElse(() => unlink(dataJsonPath));
+        tryExec(() => unlinkSync(dataJsonPath));
         // clear stored server URL so checkServerUrl() re-configures the CLI
         await LocalStorage.removeItem(LOCAL_STORAGE_KEY.SERVER_URL);
       } catch (extractError) {

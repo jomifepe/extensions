@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, statSync, unlinkSync } from "fs";
 import { readdir, unlink } from "fs/promises";
 import { join } from "path";
 import streamZip from "node-stream-zip";
-import { tryOrElse } from "~/utils/errors";
+import { tryExec } from "~/utils/errors";
 
 export function waitForFileAvailable(path: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -35,7 +35,7 @@ export async function removeFilesThatStartWith(startingWith: string, path: strin
     const files = await readdir(path);
     for await (const file of files) {
       if (!file.startsWith(startingWith)) continue;
-      await tryOrElse(async () => {
+      await tryExec(async () => {
         await unlink(join(path, file));
         removedAtLeastOne = true;
       });
@@ -47,6 +47,6 @@ export async function removeFilesThatStartWith(startingWith: string, path: strin
 }
 export function unlinkAllSync(...paths: string[]) {
   for (const path of paths) {
-    tryOrElse(() => unlinkSync(path));
+    tryExec(() => unlinkSync(path));
   }
 }
