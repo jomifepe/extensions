@@ -1,6 +1,6 @@
 # Bitwarden Changelog
 
-## [Fix & Improvements] - {PR_MERGE_DATE}
+## [Fix & Improvements] - 2026-03-24
 
 - Catch error when unlinking data.json file
 - Fix Search Vault primaryAction preference and add "Show Details" option
