@@ -29,7 +29,7 @@ const { primaryAction } = getPreferenceValues<Preferences.Search>();
 const VaultItemActionPanel = () => {
   const { type, id } = useSelectedVaultItem();
 
-  const showDetailsAction = <ShowItemDetailsAction key="showDetails" />;
+  const showDetailsAction = <ShowItemDetailsAction data-order-key="showDetails" />;
 
   return (
     <ActionPanel>
@@ -37,8 +37,8 @@ const VaultItemActionPanel = () => {
         <ActionPanel.Section>
           <ComponentOrderer first={primaryAction}>
             {showDetailsAction}
-            <CopyPasswordAction key="copy" />
-            <PastePasswordAction key="paste" />
+            <CopyPasswordAction data-order-key="copy" />
+            <PastePasswordAction data-order-key="paste" />
           </ComponentOrderer>
           <CopyTotpAction />
           <PasteTotpAction />
@@ -81,8 +81,8 @@ const VaultItemActionPanel = () => {
       )}
       {type === ItemType.SSH_KEY && (
         <>
-          {showDetailsAction}
           <ActionPanel.Section>
+            {showDetailsAction}
             <CopyPublicKeyAction />
             <CopyKeyFingerprintAction />
             <CopyPrivateKeyAction />

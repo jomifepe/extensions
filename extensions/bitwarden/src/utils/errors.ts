@@ -79,9 +79,9 @@ export class SendInvalidPasswordError extends ManuallyThrownError {
 
 /* -- error utils below -- */
 
-export function tryOrElse<T>(fn: () => T): T;
-export function tryOrElse<T>(fn: () => Promise<T>): Promise<T>;
-export function tryOrElse<T>(promise: Promise<T>): Promise<T>;
+export function tryOrElse<T>(fn: () => T): T extends void ? T : undefined;
+export function tryOrElse<T>(fn: () => Promise<T>): Promise<T extends void ? T : undefined>;
+export function tryOrElse<T>(promise: Promise<T>): Promise<T extends void ? T : undefined>;
 export function tryOrElse<T, F>(fn: () => T, fallbackValue: F): T | F;
 export function tryOrElse<T, F>(fn: () => Promise<T>, fallbackValue: F): Promise<T | F>;
 export function tryOrElse<T, F>(promise: Promise<T>, fallbackValue: F): Promise<T | F>;

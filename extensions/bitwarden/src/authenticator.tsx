@@ -156,9 +156,9 @@ function ListItem({ item }: { item: Item }) {
           <ActionPanel>
             {canGenerate ? (
               <ComponentOrderer first={preferences.primaryAction}>
-                <ShowItemDetailsAction key="showDetails" />
-                <CopyCodeAction key="copy" />
-                <PasteCodeAction key="paste" />
+                <ShowItemDetailsAction data-order-key="showDetails" />
+                <CopyCodeAction data-order-key="copy" />
+                <PasteCodeAction data-order-key="paste" />
               </ComponentOrderer>
             ) : (
               <ConfirmAction onConfirm={() => setCanGenerate(true)} />
