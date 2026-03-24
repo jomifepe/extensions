@@ -35,7 +35,6 @@ import ListFolderDropdown from "~/components/ListFolderDropdown";
 import ComponentOrderer from "~/components/ComponentOrderer";
 import { useStateEffect } from "~/utils/hooks/useStateEffect";
 import { captureException } from "~/utils/development";
-import { ShowItemDetailsAction } from "~/components/searchVault/actions";
 
 const AuthenticatorCommand = () => (
   <RootErrorBoundary>
@@ -156,7 +155,6 @@ function ListItem({ item }: { item: Item }) {
           <ActionPanel>
             {canGenerate ? (
               <ComponentOrderer first={preferences.primaryAction}>
-                <ShowItemDetailsAction data-order-key="showDetails" />
                 <CopyCodeAction data-order-key="copy" />
                 <PasteCodeAction data-order-key="paste" />
               </ComponentOrderer>
